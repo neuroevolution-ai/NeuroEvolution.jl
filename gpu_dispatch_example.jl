@@ -1,6 +1,6 @@
-#import Pkg; 
-#Pkg.add("BenchmarkTools")
-#Pkg.add("CUDA")
+import Pkg; 
+Pkg.add("BenchmarkTools")
+Pkg.add("CUDA")
 
 using CUDA;
 N = 256*2
