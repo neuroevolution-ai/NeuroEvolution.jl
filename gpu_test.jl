@@ -1,4 +1,4 @@
-using CUDA
+#using CUDA
 using Pkg
 
-Pkg.test("CUDA")
+Pkg.add("CUDA")
