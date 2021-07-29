@@ -1,8 +1,10 @@
 using JSON
 using Random
-include("brain.jl")
-include("environment.jl")
-include("optimizer.jl")
+using Statistics
+
+#include("brains/brain.jl")
+include("environments/environment.jl")
+include("optimizers/optimizer.jl")
 
 
 
@@ -32,9 +34,9 @@ config = TrainingCfg(number_generations, number_validation_runs, number_rounds,m
 
 environment_class = get_environment_class(config.environment["type"])
 
-brain_class = get_brain_class(config.brain["type"])
+#brain_class = get_brain_class(config.brain["type"])
 
-optimizer_class = get_optimizer_class(config.optimizer["type"])
+#optimizer_class = get_optimizer_class(config.optimizer["type"])
 
 
 
@@ -47,11 +49,11 @@ best_genome_overall = nothing
 best_reward_overall = typemin(Int32)
 
 
-range = 1:config.number_generations
-for generation in range
+for generation in 1:config.number_generations
 
     #get start time of generation
 env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
+
     #get genomes from optimizer -> genomes opt.ask()
 genomes = [1,2,3,4,5] #temp genomes till optimizer functions
 evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
@@ -69,12 +71,19 @@ evaluations = [value = [genome, env_seed, config.number_rounds] for genome in ge
 #Valdiation runs for best genome
 #validation_evaluations = [value = [best_genome_current_generation, index, 1] for index in 1:config.number_validation_runs]
 
-#rewards_validations
+    #rewards_validation = ep_runner.eval_fitness(evaluations)
+
+    #best_reward_current_generation = mean(rewards_validation)
+    #        if best_reward_current_generation > best_reward_overall
+    #        best_genome_overall = best_genome_current_generation
+    #        best_reward_overall = best_reward_current_generation
+    #end
+
+    #get  elapsed time of current generation
 
 
-
-
-    #safe Info about genomes in evaluation Array in format [genome,env_seed,config.number_rounds]
-
-
+    #write Log
 end
+
+#get elapsed time total
+#write Results to Simulation_results

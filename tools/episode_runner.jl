@@ -16,6 +16,19 @@ self.env_class = env_class
                                                         configuration=self.brain_configuration)
 
 =#
+struct EpisodeRunner
 
+    env_class ::
+    env_configuration :: Dict
+    environment ::
+
+
+end
 
 function eval_fitness()
+    body
+end
+
+function kernel_eval_fitness()
+
+end
