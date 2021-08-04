@@ -49,4 +49,7 @@ CUDA.@profile @cuda blocks=112 threads=m kernel_matmul(Cd', Ad', Bd', m, p)
 
 #@time C = A*B
 
+println(Cd)
+println(A*B)
+
 println("Finished")
