@@ -7,7 +7,7 @@ using CUDA
 function kernel_matmul(C, A, B, m, p)
   tx = threadIdx().x
 
-  for j in 1:1000
+  for j in 2:1000
     Cvalue = 0.0f0
 
     if tx <= m
@@ -31,7 +31,7 @@ using Test
 CUDA.allowscalar(false)
 
 precision = Float32
-m, p = 1000, 1000 # matrix sizes: C[m,1] = A[m,p] * B[p,1]
+m, p = 100, 100 # matrix sizes: C[m,1] = A[m,p] * B[p,1]
 A, B, C = rand(precision,m,p), rand(precision,p), rand(precision,m)
 
 Ad, Bd, Cd = CuArray(A), CuArray(B), CuArray(C)
@@ -45,7 +45,7 @@ C = A*B
 CUDA.allowscalar(true)
 #@test C == Cd
 
-@cuda blocks=112 threads=m kernel_matmul(Cd', Ad', Bd', m, p)
+CUDA.@profile @cuda blocks=112 threads=m kernel_matmul(Cd', Ad', Bd', m, p)
 
 #@time C = A*B
 
