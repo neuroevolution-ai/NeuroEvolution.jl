@@ -21,6 +21,13 @@ function kernel_matmul_fast(C, A, B, m, p)
     end
   end
 
+  #if blockIdx().x == 1
+  #  for j in 1:p
+  #    @cuprintln("A: $(A[tx, j])")
+  #    @cuprintln("sA: $(sA[tx, j])")
+  #  end
+  #end
+
   # Wait until all threads finish preloading
   sync_threads()
 
@@ -29,7 +36,7 @@ function kernel_matmul_fast(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += A[tx, i] * B[i]
+        Cvalue += sA[tx, i] * sB[i]
         #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
       end
       C[tx] = Cvalue
@@ -80,8 +87,9 @@ C = A*B
 CUDA.allowscalar(true)
 #@test C == Cd
 
-for i in 1:100
-  @cuda blocks=112 threads=m kernel_matmul_fast(Cd, Ad, Bd, m, p)
+for i in 1:10
+  #@cuda blocks=112 threads=m shmem=sizeof(Float32)*m*p kernel_matmul(Cd, Ad, Bd, m, p)
+  @cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
 end
 #@time C = A*B
