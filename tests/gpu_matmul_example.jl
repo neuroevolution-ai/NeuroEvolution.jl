@@ -31,7 +31,7 @@ function kernel_matmul_fast(C, A, B, m, p)
   # Wait until all threads finish preloading
   sync_threads()
 
-  for j in 2:1000
+  for j in 1:2000
     Cvalue = 0.0f0
 
     if tx <= m
@@ -51,7 +51,7 @@ end
 function kernel_matmul(C, A, B, m, p)
   tx = threadIdx().x
 
-  for j in 2:1000
+  for j in 1:2000
     Cvalue = 0.0f0
 
     if tx <= m
@@ -87,7 +87,7 @@ C = A*B
 CUDA.allowscalar(true)
 #@test C == Cd
 
-for i in 1:10
+for i in 1:100
   #@cuda blocks=112 threads=m shmem=sizeof(Float32)*m*p kernel_matmul(Cd, Ad, Bd, m, p)
   @cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
