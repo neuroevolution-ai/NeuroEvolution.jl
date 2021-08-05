@@ -29,7 +29,7 @@ function kernel_matmul_fast(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += A[i, tx] * B[i]
+        Cvalue += A[tx, i] * B[i]
         #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
       end
       C[tx] = Cvalue
@@ -49,7 +49,7 @@ function kernel_matmul(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += A[i, tx] * B[i]
+        Cvalue += A[tx, i] * B[i]
         #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
       end
       C[tx] = Cvalue
@@ -81,7 +81,7 @@ CUDA.allowscalar(true)
 #@test C == Cd
 
 for i in 1:100
-  @cuda blocks=112 threads=m kernel_matmul(Cd', Ad', Bd', m, p)
+  @cuda blocks=112 threads=m kernel_matmul_fast(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
 end
 #@time C = A*B
