@@ -2,7 +2,7 @@ from deap import base
 from deap import creator
 from deap import cma
 import numpy as np
-import attr
+#import attr
 from i_optimizer import IOptimizer, registered_optimizer_classes
 
 

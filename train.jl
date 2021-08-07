@@ -1,6 +1,7 @@
 using JSON
 using Random
 using Statistics
+using CUDA
 
 #include("brains/brain.jl")
 include("environments/environment.jl")
@@ -18,6 +19,7 @@ struct TrainingCfg
     optimizer::Dict
     experiment_id::Int
 end
+
 
 configuration = JSON.parsefile("configurations/CMA_ES_Deap_CTRNN_Dense.json")
 
@@ -38,10 +40,9 @@ environment_class = get_environment_class(config.environment["type"])
 
 #optimizer_class = get_optimizer_class(config.optimizer["type"])
 
-
-
-#instantiate episode runner
-#instantiate opimizer
+display(environment)
+episode_runner = EpisodeRunner()
+optimizer = inititalize_optimizer()
 
 #get start time of training and Date
 
@@ -52,11 +53,10 @@ best_reward_overall = typemin(Int32)
 for generation in 1:config.number_generations
 
     #get start time of generation
-env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
+    env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
 
-    #get genomes from optimizer -> genomes opt.ask()
-genomes = [1,2,3,4,5] #temp genomes till optimizer functions
-evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
+    genomes = ask(optimizer)
+    evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
 #display(evaluations)
 
 
