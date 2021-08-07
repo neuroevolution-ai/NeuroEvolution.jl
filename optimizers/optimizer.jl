@@ -1,16 +1,28 @@
-module Optimizer
 
 
 ###Imports
 using PyCall
 using Conda
 using JSON
-scriptdir = @__DIR__
-pushfirst!(PyVector(pyimport("sys")."path"), scriptdir)
-optimizer = pyimport("cma_es_deap")
 
+function inititalize_optimizer()#arguments: indiviual size // optimizer.config
+    scriptdir = @__DIR__
+    pushfirst!(PyVector(pyimport("sys")."path"), scriptdir)
+    optimizer = pyimport("cma_es_deap")
+    opt = optimizer.OptimizerCmaEsDeap(100,("A"=>1, "B"=>2))
+    return opt
+end
 
-config = ()
+function ask(optimizer)
+    return optimizer.ask()
+end
+
+function tell(optimizer, rewards)
+    return optimizer.tell(rewards)
+end
+#optimizer = inititalize_optimizer()
+#print(optimizer.ask())
+
 #opt = optimizer.OptimizerCmaEsDeap(100,config)
 #print(opt.ask())
 #opt = optimizer.OptimizerCma(100)
@@ -99,4 +111,3 @@ function ask()
 end
 
 =#
-end
