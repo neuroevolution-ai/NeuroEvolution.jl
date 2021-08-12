@@ -19,34 +19,59 @@ struct TrainingCfg
     experiment_id::Int
 end
 
+# number_blocks = 112; number_threads = number_neurons
+function all_eval_fitness_kernel(A,B,C,individuals,env_seed,number_rounds)
+    #index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    # V,W,T global intialisieren
 
-function all_eval_fitness_kernel(individuals,env_seed,number_rounds)
-    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
 
+    #for i in 1:6
+    #@cuprintln("Block:",blockIdx().x, " Thread:", threadIdx().x," Genomepart:",individuals[blockIdx().x][threadIdx().x])
+    #V[threadIdx().x] = individuals[threadIdx().x]
+    #V[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+
+    #end
+    #=
+    for i in 1:50
+    W[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+
+    end
+    for i in 1:2
+    T[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+    end
+    x[threadIdx().x][blockIdx().x] = 0.0f0
+    sync_threads()
+    =#
+
+    tx = threadIdx().x
+    m = convert(Int32,50)
+    p = convert(Int32,50)
+
+        for index in 1:1000
+
+            for j in 1:2000
+                Cvalue = 0.0f0
+
+                if tx <= m
+                    for i = 1:p 
+                        Cvalue += A[tx, i] * B[i]
+                        #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
+                    end
+                C[tx] = Cvalue
+                #@cuprintln(C[tx])
+                end
+            end
+
+            #step()
+            #env()
+            #fitness_current += reward
+        end
+
+    #out[blockIdx] = fitness_total / 5#number_rounds
+    return
 end
 
 function one_eval_fitness_kernel(individual,env_seed,number_rounds)
-index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
-    #instantiate brain
-        number_neurons = 50
-        input_size = 6
-
-
-        #ptr_V = CUDA.@cuStaticSharedMem(Float32,input_size*number_neurons)
-        #ptr_W = CUDA.fill(1.0f0,number_neurons)
-        ptr_V = CUDA.view(individual,1:(input_size*number_neurons*blockIdx().x))
-        ptr_V = CUDA.reshape(ptr_V,(input_size,(number_neurons*blockIdx().x)))
-        @cuprintln(ndims(ptr_V))
-        @cuprintln(size(ptr_V))
-        #ptr_V[index] = ptr_V[index] + index*ptr_V[index]
-        #sync_threads()
-        #@cuprintln(my_subtract(ptr_V[index],ptr_V[index*index]))
-        #V = CUDA.view(individual,1:300)
-        #V = CUDA.reshape(V,6,50)
-        #W = CuDeviceArray(V)
-        #V = CuDeviceArray(300)
-        #@cuprintln(typeof(ptr_V))
-        #V = CuDeviceArray(300,ptr_V)
 
     return
 end
@@ -151,8 +176,17 @@ end
 #get elapsed time total
 #write Results to Simulation_results
 end
-individual = CUDA.fill(1.0f0,2900)
-@device_code_warntype @cuda threads=5 blocks= 2 one_eval_fitness_kernel(individual,1,5)
+
+
+individuals = CUDA.fill(1.0f0,10,10)
+display(individuals)
+A = CUDA.rand(Int32,50,50)
+B = CUDA.rand(Int32,50)
+C = similar(B)
+#display(individuals)
+@device_code_warntype @cuda threads=50 blocks=1 all_eval_fitness_kernel(A,B,C,individuals,1,5)
+synchronize()
+display(C)
 #main()
 
 

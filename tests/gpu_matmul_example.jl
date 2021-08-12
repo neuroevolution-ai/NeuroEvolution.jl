@@ -50,7 +50,7 @@ end
 """ Compute C = A * B """
 function kernel_matmul(C, A, B, m, p)
   tx = threadIdx().x
-
+  for index in 1:1000
   for j in 1:2000
     Cvalue = 0.0f0
 
@@ -63,7 +63,7 @@ function kernel_matmul(C, A, B, m, p)
       #@cuprintln(C[tx])
     end
   end
-  
+  end
   return nothing
 end
 
@@ -85,19 +85,18 @@ C = A*B
 
 CUDA.allowscalar(true)
 #@test C == Cd
-@cuda launch=false kernel_matmul(Cd, Ad, Bd, m, p)
-for i in 1:100
+#for i in 1:100
   #@cuda blocks=112 threads=m shmem=sizeof(Float32)*m*p kernel_matmul(Cd, Ad, Bd, m, p)
   #global Cd = Ad * Bd
   @cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
-end
+#end
 #@time C = A*B
 
 
 
-println(Cd)
-println(A*B)
+#println(Cd)
+#println(A*B)
 
 println("Finished")
 

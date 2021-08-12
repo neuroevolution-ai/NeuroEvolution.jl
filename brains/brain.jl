@@ -25,10 +25,10 @@ struct ContinuousTimeRNNCfg
 end
 
 struct ContinuousTimeRNN
-    V::CuDeviceArray
-    W::CuDeviceArray
-    T::CuDeviceArray
-    x::CuDeviceArray
+    V::CuArray
+    W::CuArray
+    T::CuArray
+    x::CuArray
 end
 function Adapt.adapt_structure(to, ctrnn::ContinuousTimeRNN)
     V = Adapt.adapt_structure(to, ctrnn.V)
@@ -52,15 +52,9 @@ brain_state
 =#
 function inititalize(input_size :: Int, output_size :: Int, individual, number_neurons)#, brain_state :: Dict)
 
-#get necessary info from config file
-#brain_type = configuration["type"]
-#delta_t = configuration["delta_t"]main
+
 number_neurons = 50 #configuration["number_neurons"]
-#differential_equation = configuration["differential_equation"]
-#clipping_range_min = configuration["clipping_range_min"]
-#clipping_range_max = configuration["clipping_range_max"]
-#set_principle_diagonal_elements_of_W_negative = configuration["set_principle_diagonal_elements_of_W_negative"]
-#alpha = configuration["alpha"]
+
 #
 
 v_size = input_size * number_neurons
