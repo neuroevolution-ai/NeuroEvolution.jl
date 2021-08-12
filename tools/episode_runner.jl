@@ -1,4 +1,4 @@
-
+#
 #=
 data eneded for episode runner:
 
@@ -20,7 +20,7 @@ struct EpisodeRunner
 
     env_class :: String
     env_configuration :: Dict
-    environment :: Environment
+    #environment :: Environment
     input_size :: Int
     output_size :: Int
     brain_class :: String
@@ -31,8 +31,8 @@ struct EpisodeRunner
 
 end
 
-function eval_fitness(episoderunner :: EpisodeRunner, Individuals :: Array, env_seed :: Int, number_rounds::Int)
-
+function eval_fitness(episoderunner::EpisodeRunner, Individuals::Array, env_seed::Int, number_rounds::Int)
+    
 
 end
 

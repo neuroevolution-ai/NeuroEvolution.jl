@@ -23,7 +23,7 @@ function kernel(out)
     arr = @cuDynamicSharedMem(Int32, (w, h, 3))
     arr[x,y,z] = Int32(1)
     linear_index::Int32  = l(x,y,z,w,h)
-    arr[linear_index] = Int32(1) # still works
+    arr[linear_index] = Int32(1) # still worksusi
 
     out[x, y] = linear_index
     return nothing
@@ -44,7 +44,7 @@ function main()
     width = 10
     height = 10
     matrix = make_matrix(width, height)
-    println(matrix)
+    #display(matrix)
 end
 
 main()

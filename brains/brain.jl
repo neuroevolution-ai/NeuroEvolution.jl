@@ -18,30 +18,28 @@ registered_brain_classes["CTRNN"] = "ContinuousTimeRNN"
 =#
 
 using CUDA
+using Adapt
 
-#function read_matrix_from_genome(args)
-#    body
-#end
+struct ContinuousTimeRNNCfg
+    number_neurons::Int
+end
 
-#function get_activation_function(args)
-#    body
-#end
+struct ContinuousTimeRNN
+    V::CuDeviceArray
+    W::CuDeviceArray
+    T::CuDeviceArray
+    x::CuDeviceArray
+end
+function Adapt.adapt_structure(to, ctrnn::ContinuousTimeRNN)
+    V = Adapt.adapt_structure(to, ctrnn.V)
+    W = Adapt.adapt_structure(to, ctrnn.W)
+    T = Adapt.adapt_structure(to, ctrnn.T)
+    x = Adapt.adapt_structure(to, ctrnn.x)
+    ContinuousTimeRNN(V, W, T, x)
+end
 
 function get_individual_size(brain_type, input_size:: Int, output_size:: Int, configuration:: Dict, brain_state:: Dict)
     #uses context information to calculate the required number of free parameter needed to construct an individual of this class
-end
-
-#=
-function tanh(x::CuArray)
-end
-=#
-function sum_dict(node)
-    sum_ = 0
-end
-
-
-function get_free_parameter_usage(brain_type:: CTRNNBRAIN, input_size:: Int, output_size:: Int, configuration:: Dict, brain_state:: Dict) #do Brain typoe be ENUM probably
-    body
 end
 
 #=
@@ -52,90 +50,160 @@ individual
 configuration
 brain_state
 =#
-function inititalize(input_size :: Int, output_size :: Int, individual :: Array, configuration :: Dict, brain_state :: Dict)
+function inititalize(input_size :: Int, output_size :: Int, individual, number_neurons)#, brain_state :: Dict)
 
-#get necessary info from congif file
-brain_type = configuration['type']
-delta_t = configuration['delta_t']
-number_neurons = configuration['number_neurons']
-differential_equation = configuration['differential_equation']
-clipping_range_min = configuration['clipping_range_min']
-clipping_range_max = configuration['clipping_range_max']
-set_principle_diagonal_elements_of_W_negative = configuration['set_principle_diagonal_elements_of_W_negative']
-alpha = configuration['alpha']
+#get necessary info from config file
+#brain_type = configuration["type"]
+#delta_t = configuration["delta_t"]main
+number_neurons = 50 #configuration["number_neurons"]
+#differential_equation = configuration["differential_equation"]
+#clipping_range_min = configuration["clipping_range_min"]
+#clipping_range_max = configuration["clipping_range_max"]
+#set_principle_diagonal_elements_of_W_negative = configuration["set_principle_diagonal_elements_of_W_negative"]
+#alpha = configuration["alpha"]
 #
 
-#set sizes for masks
-v_size = input_size * brain_state.number_neurons
-w_size = brain_state.number_neurons * brain_state.number_neurons
-t_size = brain_state.number_neurons * output_size
-index = v_size + w_size + t_size
-#
+v_size = input_size * number_neurons
+w_size = number_neurons * number_neurons
+t_size = number_neurons * output_size
+index = v_size + w_size + t_size 
 
 
 #inititalize the masks
-V = CuArray{CuArray}[[element] for element in individual[0:v_size]]
-W =
-T =
-#
+v_cpu = view(individual,1:v_size)
+w_cpu = view(individual,v_size+1:v_size+w_size)
+t_cpu = view(individual,v_size+w_size+1:v_size+w_size+t_size)
 
 #reshape the masks to correct dimensions
-V = reshape(V,number_neurons,input_size)
-W = reshape(W,number_neurons,number_neurons)
-T = reshape(T,output_size,number_neurons)
-#
+v_cpu = reshape(v_cpu,number_neurons,input_size)
+w_cpu = reshape(w_cpu,number_neurons,number_neurons)
+t_cpu = reshape(t_cpu,output_size,number_neurons)
 
-if(set_principle_diagonal_elements_of_W_negative)
-    for j in 1:number_neurons
-        W[j][j] = -abs(W[j][j])
-    end
+#if(set_principle_diagonal_elements_of_W_negative)
+#    w_cpu[diagind(w_cpu)] .= map(-,map(abs,w_cpu[diagind(w_cpu)]))
+#end
+
+#load masks onto GPU
+V_gpu = CuArray(v_cpu)
+W_gpu = CuArray(w_cpu)
+T_gpu = CuArray(t_cpu)
+
+x = CUDA.fill(0.0f0, number_neurons)
+
+return ContinuousTimeRNN(V_gpu,W_gpu,T_gpu,x)
+
+
 end
-x0 = CUDA.fill(0, number_neurons)
 
-x = x0
-
-brain_config_array = CuArray{Any}[]
+function reset(x)
+    return x = CUDA.fill(0.0f0,length(x))
 end
 
 #=step functions
 config_array: represents the current state and configuration of the brain. Has format:
 input_array: represents current state of environment as given by either the environments step() or reset() function. Has format =
 =#
-function step(config_array::Any[], input_array:: Array)
+#TODO: Make sure everything is a FLoat32
+function step(CTRNN::ContinuousTimeRNN,x, input_array::CuArray)
     #assert input_array is 1-dimensional
-
+    alpha = 0.0
+    delta_t = 0.05
+    clipping_range = 1.0
     #differential Equations:
-    if config_array.differential_equation == 'separated'
-        dx_dt = -config_array.alpha * config_array.x + config_array.W.dot(tanh(config_array.x)) + config_array.V.dot(input_array) #TODO numpy tanh function find replacement
-    elseif config_array.differential_equation == 'original'
-        dx_dt = -config_array.alpha * config_array.x + config_array.W.dot(tanh(config_array.x) + config_array.V.dot(input_array)) #TODO numpy tanh function find replacement
-    else
-        #throw RuntimeError
-    end
+
+    dx_dt = (x .+ -alpha) + CTRNN.W*(map(tanh,CTRNN.V * input_array)) #TODO numpy tanh function find replacement
 
     # Euler forward discretization
-    config_array.x = config_array.x + config_array.delta_t * dx_dt
-
+    x = x .+ delta_t * dx_dt
     # Clip y to state boundaries
-    config_array.x = clip(config_array.x, -config_array.clipping_range, +config_array.clipping_range) #TODO numpy clip() function find replacement
-
+    x = broadcast(clamp,x, -clipping_range, +clipping_range) #TODO numpy clip() function find replacement  #figure out how to do clamp
     # Calculate outputs
-    y = tanh(config_array.T.dot(config_array.x)) #TODO tanh() is numpy function find replacement
-
+    y = map(tanh,CTRNN.T * x) #TODO tanh() is numpy function find replacement
+    #display(y)
     #assert y is 1-dimensional
-    return y
+    #CUDA.unsafe_free!(x)
+    return y,x
 end
 
+function step(v_mask,w_mask,t_mask,x,input_array)
+    #assert input_array is 1-dimensional
+    alpha = 0.0
+    delta_t = 0.05
+    clipping_range = 1.0
+    #differential Equations:
 
-function get_masks_from_brain_state(brain_state :: Dict) # what format for brain_state
-    v_mask = brain_state['v_mask']
-    w_mask = brain_state['w_mask']
-    t_mask = brain_state['t_mask']
+    dx_dt = (x .+ -alpha) + w_mask*(map(tanh,v_mask * input_array)) #TODO numpy tanh function find replacement
+
+    # Euler forward discretization
+    x = x .+ delta_t * dx_dt
+    # Clip y to state boundaries
+    x = broadcast(clamp,x, -clipping_range, +clipping_range) #TODO numpy clip() function find replacement  #figure out how to do clamp
+    # Calculate outputs
+    y = map(tanh,t_mask * x) #TODO tanh() is numpy function find replacement
+    #display(y)
+    #assert y is 1-dimensional
+    #CUDA.unsafe_free!(x)
+    return y,x
+end
+
+function get_masks_from_brain_state(brain_state::Dict) # what format for brain_state
+    v_mask = get(brain_state,"v_mask",1)
+    w_mask = get(brain_state,"w_mask",1)
+    t_mask = get(brain_state,"t_mask",1)
 
     return v_mask, w_mask, t_mask
 end
 
-function _generate_mask(n :: Int, m :: Int, keep_main_diagonal= false :: boolean)
-    mask =
-    return mask
+function _generate_mask(n :: Int, m :: Int)
+    return trues(n,m)
+end
+
+
+function generate_brain_state(input_size,output_size,configuration::Dict)
+    #config = ContinuousTimeRNNCfg(value for (key,value) in configuration)
+
+    v_mask = _generate_mask(50, input_size)
+    w_mask = _generate_mask(50, 50)
+    t_mask = _generate_mask(output_size, 50)
+
+    return get_brain_state_from_masks(v_mask,w_mask,t_mask)
+end
+
+function get_brain_state_from_masks(v_mask,w_mask,t_mask)
+    return Dict("v_mask"=> v_mask,"w_mask"=>w_mask,"t_mask"=>t_mask)
+end
+
+function get_free_parameter_usage(input_size,output_size,configuration,brain_state)
+    v_mask, w_mask, t_mask = get_masks_from_brain_state(brain_state)
+
+        #count true values
+    free_parameters_v = count(v_mask)
+    free_parameters_w = count(w_mask)
+    free_parameters_t = count(t_mask)
+
+    free_parameters = Dict("V"=>free_parameters_v,"W"=> free_parameters_w,"T"=>free_parameters_t)
+    #=
+    if(configuration["optimize_x0"])
+        free_parameters["x_0"] = configuration["number_neurons"]
+    end
+    =#
+    return free_parameters
+end
+
+function sum_dict(node)
+    sum_ = 0
+    for (key,value) in node
+        if(value isa Dict)
+            sum_ += sum_dict(value)
+        else
+            sum_ += value
+        end
+        
+    end
+    return sum_
+end
+
+function get_individual_size(input_size,output_size,configuration,brain_state)
+    usage_dict = get_free_parameter_usage(input_size,output_size,configuration, brain_state)
+    return sum_dict(usage_dict)
 end

@@ -1,46 +1,73 @@
-
 using CUDA
-using BenchmarkTools
+using Adapt
+using JSON
 
 
-x_d = CUDA.fill(1.0f0,50)  # a vector stored on the GPU filled with 1.0 (Float32)
-#display(x_d)
-#a = fill(x_d,5)
-#display(a)
+struct Interpolate{CuArray}
+    xs::CuArray
+    ys::CuArray
+end
+#=
+function (itp::Interpolate)(x)
+    i = searchsortedfirst(itp.xs, x)
+    i = clamp(i, firstindex(itp.ys), lastindex(itp.ys))
+    @inbounds itp.ys[i]
+end
+=#
+function Adapt.adapt_structure(to, itp::Interpolate)
+    xs = Adapt.adapt_structure(to, itp.xs)
+    ys = Adapt.adapt_structure(to, itp.ys)
+    Interpolate(xs, ys)
+end
 
-
-function kernel_func(x::CuDeviceArray)
-    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
-    #CUDA.nanosleep(10)
-    @cuprintln("Index:",x[index])
+function kernel(itp::Interpolate)
+    @cuprintln("1")
     return
 end
 
-function kernel_interrupting()
-    @cuprintln("Am I interrupting?")
+#@cuda kernel(itp)
+
+
+struct TestStruct{A}
+    x::A
+    y::A
+    z::Int
+end
+function Adapt.adapt_structure(to, test::TestStruct)
+    x = Adapt.adapt_structure(to, test.x)
+    y = Adapt.adapt_structure(to, test.y)
+    z = Adapt.adapt_structure(to, test.z)
+    TestStruct(x, y, z)
+end
+function kernel(test::TestStruct)
+    
+    test2 = TestStruct(test.x,test.y, test.z+1)
+    test = test2
+    @cuprintln(test.x[1])
+    @cuprintln(test.y[1])
+    @cuprintln(test.z)
+
     return
 end
 
-function map_call(x::CuArray)
-    @cuda kernel_func(x)
-end
+x = CUDA.fill(1.0,10)
+y = CUDA.fill(2.0,10)
+itp = Interpolate(x,y)
+#itp = Interpolate(CuArray(xs_cpu), CuArray(ys_cpu))
+#display(itp)
+#pts = CuArray(pts_cpu);
+#display(pts)
+#result = itp.(pts)
+#display(result)
 
-#@cuda kernel_func(x_d)
-a = CUDA.fill(1.0f0,10,10)
-b = CUDA.fill(2.0f0,10,10)
-c = similar(a)
 
-d = CUDA.fill(3.0f0,10,10)
-e = CUDA.fill(4.0f0,10,10)
-f = similar(d)
 
-function compute(a,b,c)
-    mul!(c,a,b)
-    broadcast!(sin,c,c)
-    synchronize()
-    c
-end
+#=
+which structs are necessary:
+-Environment
+-Brain
+-EpisodeRunner
 
-MAX_THREADS = CUDA.attribute(device(), CUDA.DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK)
-println(MAX_THREADS)
-#@btime @async compute(d,e,f)
+
+
+=#

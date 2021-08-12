@@ -1,8 +1,13 @@
 {
   "ExpandedNodes": [
     "",
-    "\\tests"
+    "\\brains",
+    "\\configurations",
+    "\\environments",
+    "\\optimizers",
+    "\\tests",
+    "\\tools"
   ],
-  "SelectedNode": "\\tests\\gpu_benchmarking.jl",
+  "SelectedNode": "\\optimizers\\cma_es_deap.py",
   "PreviewInSolutionExplorer": false
 }

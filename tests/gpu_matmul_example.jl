@@ -80,21 +80,24 @@ Ad, Bd, Cd = CuArray(A), CuArray(B), CuArray(C)
 
 # CPU
 C = A*B
-
 # CUBLAS
 #Cd = Ad * Bd
 
 CUDA.allowscalar(true)
 #@test C == Cd
-
+@cuda launch=false kernel_matmul(Cd, Ad, Bd, m, p)
 for i in 1:100
   #@cuda blocks=112 threads=m shmem=sizeof(Float32)*m*p kernel_matmul(Cd, Ad, Bd, m, p)
+  #global Cd = Ad * Bd
   @cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
 end
 #@time C = A*B
 
+
+
 println(Cd)
 println(A*B)
 
 println("Finished")
+
