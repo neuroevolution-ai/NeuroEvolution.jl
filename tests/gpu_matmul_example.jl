@@ -15,13 +15,13 @@ function kernel_matmul_fast(C, A, B, m, p)
 
   # Initialize shared memory for A
   for j in 1:p
-    sA[tx, j] = A[tx, j]
+    @inbounds  sA[tx, j] = A[tx, j]
   end
 
   # Initialize shared memory for B
   if tx == 1
     for j in 1:p
-        sB[j] = B[j]
+      @inbounds  sB[j] = B[j]
     end
   end
 
@@ -33,10 +33,10 @@ function kernel_matmul_fast(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += sA[tx, i] * sB[i]
+        @inbounds  Cvalue += sA[tx, i] * sB[i]
         #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
       end
-      C[tx] = Cvalue
+      @inbounds  C[tx] = Cvalue
       #@cuprintln(C[tx])
     end
   end
