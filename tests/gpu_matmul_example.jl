@@ -9,8 +9,9 @@ using CUDA
 function kernel_matmul_fast(C, A, B, m, p)
   tx = threadIdx().x
 
+  # Important: The second @cuDynamicSharedMem allocation needs an offset of sizeof(sA), as it uses a single kernel-level buffer
   sA = @cuDynamicSharedMem(Float32, (m,p))
-  sB = @cuDynamicSharedMem(Float32, p)
+  sB = @cuDynamicSharedMem(Float32, p, sizeof(sA))
 
   # Initialize shared memory for A
   for j in 1:p
