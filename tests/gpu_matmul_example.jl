@@ -53,9 +53,9 @@ function kernel_matmul(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += A[tx, i] * B[i]
+        @inbounds Cvalue += A[tx, i] * B[i]
       end
-      C[tx] = Cvalue
+      @inbounds C[tx] = Cvalue
     end
   end
   
