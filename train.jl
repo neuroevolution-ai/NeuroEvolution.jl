@@ -2,6 +2,9 @@ using JSON
 using Random
 using Statistics
 using CUDA
+using BenchmarkTools
+using StaticArrays
+using Adapt
 
 include("brains/brain.jl")
 include("environments/environment.jl")
@@ -20,36 +23,58 @@ struct TrainingCfg
 end
 
 # number_blocks = 112; number_threads = number_neurons
-function all_eval_fitness_kernel(A,B,C,individuals,env_seed,number_rounds)
+function all_eval_fitness_kernel(individual)#,individuals,env_seed,number_rounds)
     #index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     # V,W,T global intialisieren
-
-
-    #for i in 1:6
-    #@cuprintln("Block:",blockIdx().x, " Thread:", threadIdx().x," Genomepart:",individuals[blockIdx().x][threadIdx().x])
+    V = @cuStaticSharedMem(Float32,(6,50))
+    tx= threadIdx().x
+    for i in 1:6
+        @inbounds V[i,tx] = individual[i*tx]
+    @cuprintln(V[i,tx])
+    end
+    #@cuprintln(V[1][1])
+    #@cuprintln(V[1][1][1])
+    #assign genome values to V Matrix
+    #for i in 1:6 #range(1:input_size)
     #V[threadIdx().x] = individuals[threadIdx().x]
     #V[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
 
     #end
-    #=
-    for i in 1:50
-    W[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+    #
 
-    end
-    for i in 1:2
-    T[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
-    end
+    W = @cuStaticSharedMem(Float32,(50,50,112))
+    #assign genome values to W Matrix
+    #for i in 1:50 #range(1:number_neurons)
+    #W[threadIdx().x] = individuals[threadIdx().x]
+    #W[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+
+    #end
+
+    #
+
+    T = @cuStaticSharedMem(Float32,(50,2,112))
+    #assign genome values to T Matrix
+
+    #for i in 1:2 #range(1:output_size)
+    #T[threadIdx().x] = individuals[threadIdx().x]
+    #T[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
+
+    #end
+    #
+
+    x = @cuStaticSharedMem(Float32,(50,1,112))
+    #=
+
     x[threadIdx().x][blockIdx().x] = 0.0f0
     sync_threads()
     =#
 
+    #MatMul, needs adaption for each specific multiplication
+    #=
     tx = threadIdx().x
-    m = convert(Int32,50)
-    p = convert(Int32,50)
 
         for index in 1:1000
 
-            for j in 1:2000
                 Cvalue = 0.0f0
 
                 if tx <= m
@@ -60,30 +85,31 @@ function all_eval_fitness_kernel(A,B,C,individuals,env_seed,number_rounds)
                 C[tx] = Cvalue
                 #@cuprintln(C[tx])
                 end
-            end
 
             #step()
             #env()
             #fitness_current += reward
         end
 
-    #out[blockIdx] = fitness_total / 5#number_rounds
+        =#
+
+#=
+  tx = threadIdx().x
+
+  for j in 1:1000
+    Cvalue = 0.0f0
+
+    if tx <= m
+      for i = 1:p 
+        Cvalue += A[tx, i] * B[i]
+        #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
+      end
+    C[tx] = Cvalue
+      #@cuprintln(C[tx])
+    end
+  end
+  =#
     return
-end
-
-function one_eval_fitness_kernel(individual,env_seed,number_rounds)
-
-    return
-end
-
-
-function alloc_mem(size)
-    mem = CUDA.@cuStaticSharedMem(Float32,size)
-    return mem
-end
-function get_brain(individual,input_size::Int32,output_size::Int32,number_neurons::Int32)#,v_size,w_size,t_size)
-
-        return ptr_V
 end
 
 function main()
@@ -171,22 +197,23 @@ function main()
     end
     
 end
-
+end
 
 #get elapsed time total
 #write Results to Simulation_results
-end
 
 
-individuals = CUDA.fill(1.0f0,10,10)
-display(individuals)
-A = CUDA.rand(Int32,50,50)
-B = CUDA.rand(Int32,50)
-C = similar(B)
-#display(individuals)
-@device_code_warntype @cuda threads=50 blocks=1 all_eval_fitness_kernel(A,B,C,individuals,1,5)
-synchronize()
-display(C)
+A = CUDA.rand(Float32,100)
+#B = CUDA.rand(Float32,50)
+#C = similar(B)
+
+#m = 50
+#p = 50
+individual = CUDA.rand(Float32,300)
+display(individual)
+@cuda threads=50 blocks=1 all_eval_fitness_kernel(individual)#,individuals,1,5)
+CUDA.synchronize()
+#print("Finished")
 #main()
 
 
