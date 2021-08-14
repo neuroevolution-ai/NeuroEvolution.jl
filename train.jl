@@ -23,51 +23,88 @@ struct TrainingCfg
 end
 
 # number_blocks = 112; number_threads = number_neurons
-function all_eval_fitness_kernel(individual)#,individuals,env_seed,number_rounds)
+function kernel_eval_fitness(individuals,V,W,T,input)#,individuals,env_seed,number_rounds)
     #index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     # V,W,T global intialisieren
-    V = @cuStaticSharedMem(Float32,(6,50))
+    delta_t = 0.05f0
     tx= threadIdx().x
-    for i in 1:6
-        @inbounds V[i,tx] = individual[i*tx]
-    @cuprintln(V[i,tx])
+    v_size = 6*50 # input_size * number_neurons
+    w_size = 50*50 # number_neurons * number_neurons
+    #t_size = 50*2 # number_neurons * output_size
+    #V = @cuStaticSharedMem(Float32,(50,6))
+    for i in 1:6 #range(1:input_size)
+        @inbounds V[tx,i] = individuals[i+((tx-1)*6)]  #tx * input_size
+        #@cuprintln("KoordinateV:",tx,";",i,":",V[tx,i])
     end
-    #@cuprintln(V[1][1])
-    #@cuprintln(V[1][1][1])
-    #assign genome values to V Matrix
-    #for i in 1:6 #range(1:input_size)
-    #V[threadIdx().x] = individuals[threadIdx().x]
-    #V[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
-
-    #end
-    #
-
-    W = @cuStaticSharedMem(Float32,(50,50,112))
-    #assign genome values to W Matrix
-    #for i in 1:50 #range(1:number_neurons)
-    #W[threadIdx().x] = individuals[threadIdx().x]
-    #W[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
-
-    #end
-
-    #
-
-    T = @cuStaticSharedMem(Float32,(50,2,112))
-    #assign genome values to T Matrix
-
-    #for i in 1:2 #range(1:output_size)
-    #T[threadIdx().x] = individuals[threadIdx().x]
-    #T[threadIdx().x][i][blockIdx().x] = individuals[blockIdx][i*threadIdx]
-
-    #end
-    #
-
-    x = @cuStaticSharedMem(Float32,(50,1,112))
-    #=
-
-    x[threadIdx().x][blockIdx().x] = 0.0f0
     sync_threads()
-    =#
+
+    #W = @cuStaticSharedMem(Float32,(50,50))
+    for i in 1:50 #range(1:number_neurons)
+        @inbounds W[tx,i] = individuals[v_size+(i+((tx-1)*50))] #tx * number_neurons
+        #@cuprintln("KoordinateW:",tx,";",i,":",W[tx,i])
+    end
+    sync_threads()
+    #
+
+    #T = @cuStaticSharedMem(Float32,(50,2))
+
+    for i in 1:2 #range(1:output_size)
+        @inbounds T[i,tx] = individuals[v_size+w_size+(tx+((i-1)*50))] #tx * output_size
+        #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
+
+    end
+
+
+    x = @cuStaticSharedMem(Float32,50)
+    x[threadIdx().x]= 0.0f0
+    sync_threads()
+    temp_V = @cuStaticSharedMem(Float32,50)
+    temp_W = @cuStaticSharedMem(Float32,50)
+    temp_T = @cuStaticSharedMem(Float32,2)
+    for index in 1:1000
+        #V*input matmul:
+        V_value = 0.0f0
+            for i = 1:6 
+                @inbounds V_value = V[tx, i] * input[i] + V_value
+            end
+            #@inbounds temp_V[tx] = V_value
+            @inbounds temp_V[tx] = tanh(V_value) #find faster option for this step
+            #@cuprintln(temp_V[tx])
+        sync_threads()
+
+        #W*temp_V matmul:
+        W_value = 0.0f0
+            for i = 1:50 
+                @inbounds W_value = W[tx, i] * temp_V[i] + W_value
+            end
+            #@inbounds x[tx] = W_value
+            @inbounds x[tx] = x[tx] + (delta_t * W_value)
+        #@cuprintln(temp_W[tx])
+        x[tx] = clamp(x[tx],-1.0f0,1.0f0)
+        sync_threads()
+        #T*temp_W matmul:
+        if tx <= 2
+        T_value = 0.0f0
+            for i in 1:50
+                @inbounds T_value =T[i,tx] * temp_W[i]
+            end
+            @inbounds temp_T[tx] = T_value
+            #@inbounds temp_T[tx] = tanh(T_value)
+            #@cuprintln(temp_T[tx])
+        end
+        sync_threads()
+    end
+    sync_threads()
+    @cuprintln("Index:",tx," Value:",temp_V[tx])
+    if tx <= 2
+    #@cuprintln("Index:",tx," Value:",temp_T[tx])
+    end
+
+
+
+    #sync_threads()
+    #@cuprintln("Index:",tx," Value:",temp_V[tx])
+
 
     #MatMul, needs adaption for each specific multiplication
     #=
@@ -109,6 +146,7 @@ function all_eval_fitness_kernel(individual)#,individuals,env_seed,number_rounds
     end
   end
   =#
+
     return
 end
 
@@ -153,73 +191,41 @@ function main()
         env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
         evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
         display(evaluations)
-        #evalFitness(genomes[1])
-    
-        #start eval_fitness
-            for evaluation in evaluations
 
-                individual = evaluation[1]
-                number_of_rounds = evaluation[3]
-                
-                brain_struct = inititalize(6,2,individual,brain)
-                x = CUDA.fill(0, 50)
-            #fitness_total = 0
-    
-            #start core routine
-                for i in 1:number_of_rounds
-                    #build environment
-                    #get first output from environment
-                    ob = CUDA.rand(Float32,6)#giveu
-                    x = CUDA.fill(0, 50) #brain reset()
-            
-                    for index in 1:2
-                        #result,x = step(brain_struct,x,ob)
-                        ob = CUDA.rand(Float32,6)#env_step() here
-                #done = true
-                        if ((generation == 1 && i == 1) || (generation == number_generations && i == number_rounds))
-                        println("Generation:",generation," Eval_Index:",index," Round:", i)
-                        end            
-                        #fitness_current += rew 
-                    end
-            
-                end
-                                                                                                            #end core routine
-                                                                                                                        #total_result = fitness_total / number_rounds
-                                                                                                                        #end eval_fitness
-            CUDA.unsafe_free!(brain_struct.V)
-            CUDA.unsafe_free!(brain_struct.W)
-            CUDA.unsafe_free!(brain_struct.T)
-            CUDA.unsafe_free!(brain_struct.x)
-        #synchronize()
-        #println("Generation:",generation," Genome:")
-        #display(individual)
 
     end
-    
-end
+
 end
 
 #get elapsed time total
 #write Results to Simulation_results
 
 
-A = CUDA.rand(Float32,100)
+#A = CUDA.rand(Float32,100)
 #B = CUDA.rand(Float32,50)
 #C = similar(B)
 
 #m = 50
 #p = 50
-individual = CUDA.rand(Float32,300)
-display(individual)
-@cuda threads=50 blocks=1 all_eval_fitness_kernel(individual)#,individuals,1,5)
-CUDA.synchronize()
+#individual = CUDA.rand(Float32,2900,112)
+individual = CUDA.rand(Float32,2900)
+#display(individual)
+V = CUDA.fill(0.0f0,50,6)
+W = CUDA.fill(0.0f0,50,50)
+T = CUDA.fill(0.0f0,2,50)
+input = CUDA.fill(1.0f0,6)
+#display(individual)
+@cuda threads=50 blocks=1 kernel_eval_fitness(individual,V,W,T,input)#,individuals,1,5)
+#CUDA.synchronize()
+#main()
+#display(T)
 #print("Finished")
 #main()
 
 
 
-
-
+#A = CuArray(1:2900)
+#A = CUDA.fill(1,50,6)
     
 
 
