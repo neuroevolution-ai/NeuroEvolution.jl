@@ -1,5 +1,5 @@
 {
-    "number_generations": 100,
+    "number_generations": 2500,
     "number_validation_runs": 100,
     "number_rounds": 5,
     "maximum_env_seed": 100000,

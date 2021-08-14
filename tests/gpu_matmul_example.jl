@@ -11,9 +11,9 @@ function kernel_matmul_fast(C, A, B, m, p)
 
   # Important: The second @cuDynamicSharedMem allocation needs an offset of sizeof(sA), as it uses a single kernel-level buffer
   sA = @cuDynamicSharedMem(Float32, (m,p))
-  #sA = @cuStaticSharedMem(Float32, (m,p))
-  sB = @cuDynamicSharedMem(Float32, p)
-  #sB = @cuStaticSharedMem(Float32, p)
+
+  sB = @cuDynamicSharedMem(Float32, p, sizeof(sA))
+
 
   # Initialize shared memory for A
   for j in 1:p
@@ -23,7 +23,7 @@ function kernel_matmul_fast(C, A, B, m, p)
   # Initialize shared memory for B
   if tx == 1
     for j in 1:p
-        sB[j] = B[j]
+        @inbounds sB[j] = B[j]
     end
   end
 
@@ -35,7 +35,7 @@ function kernel_matmul_fast(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += sA[tx, i] * sB[i]
+        @inbounds Cvalue += sA[tx, i] * sB[i]
         #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
       end
       @inbounds  C[tx] = Cvalue
@@ -54,7 +54,7 @@ function kernel_matmul(C, A, B, m, p)
 
     if tx <= m
       for i = 1:p 
-        Cvalue += A[tx, i] * B[i]
+        @inbounds Cvalue += A[tx, i] * B[i]
       end
       @inbounds C[tx] = Cvalue
     end
@@ -76,15 +76,14 @@ Ad, Bd, Cd = CuArray(A), CuArray(B), CuArray(C)
 
 #@test C == Cd
 for i in 1:100
-  #@cuda blocks=112 threads=m kernel_matmul_fast(Cd, Ad, Bd, m, p)
-  @cuda blocks=112 threads=m shmem=sizeof(Float32)*(m+1)*p kernel_matmul_fast(Cd, Ad, Bd, m, p)
-  #@cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
+  #@cuda blocks=112 threads=m shmem=sizeof(Float32)*(m+1)*p kernel_matmul_fast(Cd, Ad, Bd, m, p)
+  @cuda blocks=112 threads=m kernel_matmul(Cd, Ad, Bd, m, p)
   CUDA.synchronize()
 end
 
 #@time C = A*B
 
-#println(Cd)
-#println(A*B)
+println(Cd)
+println(A*B)
 
 println("Finished")

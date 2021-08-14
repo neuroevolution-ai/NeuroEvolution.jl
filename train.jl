@@ -24,128 +24,113 @@ end
 
 # number_blocks = 112; number_threads = number_neurons
 function kernel_eval_fitness(individuals,V,W,T,input)#,individuals,env_seed,number_rounds)
-    #index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
-    # V,W,T global intialisieren
+
+    #Init Variables
+    #####################################################
     delta_t = 0.05f0
     tx= threadIdx().x
     v_size = 6*50 # input_size * number_neurons
     w_size = 50*50 # number_neurons * number_neurons
-    #t_size = 50*2 # number_neurons * output_size
-    #V = @cuStaticSharedMem(Float32,(50,6))
+    number_rounds = 5
+    number_neurons = 50
+    input_size = 6
+    output_size = 2
+    number_timesteps = 1000
+    clipping_range = 1.0f0
+
+    #####################################################
+
+    #Fill V,W,T with genome data
+    #####################################################
     for i in 1:6 #range(1:input_size)
-        @inbounds V[tx,i] = individuals[i+((tx-1)*6)]  #tx * input_size
+        @inbounds V[tx,i] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
         #@cuprintln("KoordinateV:",tx,";",i,":",V[tx,i])
     end
-    sync_threads()
-
-    #W = @cuStaticSharedMem(Float32,(50,50))
     for i in 1:50 #range(1:number_neurons)
-        @inbounds W[tx,i] = individuals[v_size+(i+((tx-1)*50))] #tx * number_neurons
+        @inbounds W[tx,i] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
         #@cuprintln("KoordinateW:",tx,";",i,":",W[tx,i])
     end
-    sync_threads()
-    #
-
-    #T = @cuStaticSharedMem(Float32,(50,2))
-
     for i in 1:2 #range(1:output_size)
-        @inbounds T[i,tx] = individuals[v_size+w_size+(tx+((i-1)*50))] #tx * output_size
+        @inbounds T[i,tx] = individuals[blockIdx().x,v_size+w_size+(tx+((i-1)*number_neurons))] #tx * output_size
         #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
-
     end
+    #####################################################
+    sync_threads()
 
 
-    x = @cuStaticSharedMem(Float32,50)
+    x = @cuStaticSharedMem(Float32,number_neurons)
     x[threadIdx().x]= 0.0f0
     sync_threads()
-    temp_V = @cuStaticSharedMem(Float32,50)
-    temp_W = @cuStaticSharedMem(Float32,50)
-    temp_T = @cuStaticSharedMem(Float32,2)
-    for index in 1:1000
-        #V*input matmul:
-        V_value = 0.0f0
-            for i = 1:6 
-                @inbounds V_value = V[tx, i] * input[i] + V_value
+    temp_V = @cuStaticSharedMem(Float32,number_neurons)
+    temp_W = @cuStaticSharedMem(Float32,number_neurons)
+    temp_T = @cuStaticSharedMem(Float32,output_size)
+
+    #fitness_total = 0
+    #Loop through Rounds
+    #####################################################
+    for j in 1:number_rounds
+        #fitness_current = 0
+        #Loop through Timesteps
+        #################################################
+        for index in 1:number_timesteps
+
+            #Brain step()
+            #############################################
+            #V*input matmul:
+            V_value = 0.0f0
+            for i = 1:input_size 
+                    @inbounds V_value = V[tx, i] * input[i] + V_value
             end
             #@inbounds temp_V[tx] = V_value
             @inbounds temp_V[tx] = tanh(V_value) #find faster option for this step
             #@cuprintln(temp_V[tx])
-        sync_threads()
+            sync_threads()
 
-        #W*temp_V matmul:
-        W_value = 0.0f0
-            for i = 1:50 
+            #W*temp_V matmul:
+            W_value = 0.0f0
+            for i = 1:number_neurons 
                 @inbounds W_value = W[tx, i] * temp_V[i] + W_value
             end
             #@inbounds x[tx] = W_value
             @inbounds x[tx] = x[tx] + (delta_t * W_value)
-        #@cuprintln(temp_W[tx])
-        x[tx] = clamp(x[tx],-1.0f0,1.0f0)
-        sync_threads()
-        #T*temp_W matmul:
-        if tx <= 2
-        T_value = 0.0f0
-            for i in 1:50
-                @inbounds T_value =T[i,tx] * temp_W[i]
-            end
-            @inbounds temp_T[tx] = T_value
-            #@inbounds temp_T[tx] = tanh(T_value)
-            #@cuprintln(temp_T[tx])
-        end
-        sync_threads()
-    end
-    sync_threads()
-    @cuprintln("Index:",tx," Value:",temp_V[tx])
-    if tx <= 2
-    #@cuprintln("Index:",tx," Value:",temp_T[tx])
-    end
-
-
-
-    #sync_threads()
-    #@cuprintln("Index:",tx," Value:",temp_V[tx])
-
-
-    #MatMul, needs adaption for each specific multiplication
-    #=
-    tx = threadIdx().x
-
-        for index in 1:1000
-
-                Cvalue = 0.0f0
-
-                if tx <= m
-                    for i = 1:p 
-                        Cvalue += A[tx, i] * B[i]
-                        #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
-                    end
-                C[tx] = Cvalue
-                #@cuprintln(C[tx])
+            #@cuprintln(temp_W[tx])
+            x[tx] = clamp(x[tx],-clipping_range,clipping_range)
+            sync_threads()
+            #T*temp_W matmul:
+            if tx <= output_size
+                T_value = 0.0f0
+                for i in 1:number_neurons
+                    @inbounds T_value =T[i,tx] * temp_W[i]
                 end
+                @inbounds temp_T[tx] = T_value
+                #@inbounds temp_T[tx] = tanh(T_value)
+                #@cuprintln(temp_T[tx])
+            end
+            #############################################
+            #end of Brain step()
+            sync_threads()
 
-            #step()
-            #env()
-            #fitness_current += reward
+            #env step()
+            #############################################
+
+
+            #############################################
+            #end of env step()
+            sync_threads()
+
+            #Accumulate fitness
+            #############################################
+            #fitness_current += reward 
+            #############################################
+            sync_threads()
         end
 
-        =#
-
-#=
-  tx = threadIdx().x
-
-  for j in 1:1000
-    Cvalue = 0.0f0
-
-    if tx <= m
-      for i = 1:p 
-        Cvalue += A[tx, i] * B[i]
-        #@cuprintln("tx $tx, i $i, res: $(A[tx, i] * B[i])")
-      end
-    C[tx] = Cvalue
-      #@cuprintln(C[tx])
+        ####################################################
+        #end of Timestep
+        sync_threads()
     end
-  end
-  =#
+    ######################################################
+    #end of Round
 
     return
 end
@@ -180,44 +165,37 @@ function main()
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
-    input = CUDA.fill(1.0,6)
-    output = CUDA.fill(undef,2)
-
 
     for generation in 1:config.number_generations
-        #println("Generation:", generation)
 
+        individuals = fill(0.0f0,112,2900)
         genomes = convert(Array{Array{Float32}},ask(optimizer))
-        env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
-        evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
-        display(evaluations)
+        for i in 1:(size(genomes,1))
+            for j in 1:(size(genomes[1],1))
+                individuals[i,j] = (genomes[i])[j]
+            end
+        end
+        #env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
+        #evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
+        V = CUDA.fill(0.0f0,50,6)
+        W = CUDA.fill(0.0f0,50,50)
+        T = CUDA.fill(0.0f0,2,50)
+        input = CUDA.fill(1.0f0,6)
+        individuals_gpu = CuArray(individuals)
+        @cuda threads=50 blocks=112 kernel_eval_fitness(individuals_gpu,V,W,T,input)#,input)#,individuals,1,5)
+        CUDA.synchronize()
+        #display(V)
 
 
     end
 
 end
 
-#get elapsed time total
-#write Results to Simulation_results
 
-
-#A = CUDA.rand(Float32,100)
-#B = CUDA.rand(Float32,50)
-#C = similar(B)
-
-#m = 50
-#p = 50
-#individual = CUDA.rand(Float32,2900,112)
-individual = CUDA.rand(Float32,2900)
 #display(individual)
-V = CUDA.fill(0.0f0,50,6)
-W = CUDA.fill(0.0f0,50,50)
-T = CUDA.fill(0.0f0,2,50)
-input = CUDA.fill(1.0f0,6)
-#display(individual)
-@cuda threads=50 blocks=1 kernel_eval_fitness(individual,V,W,T,input)#,individuals,1,5)
+#@cuda threads=50 blocks=1 kernel_eval_fitness(individual,V,W,T,input)#,individuals,1,5)
 #CUDA.synchronize()
-#main()
+main()
 #display(T)
 #print("Finished")
 #main()
@@ -228,35 +206,3 @@ input = CUDA.fill(1.0f0,6)
 #A = CUDA.fill(1,50,6)
     
 
-
-
-#get start time of generation
-
-    #genomes = ask(optimizer)
- #evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
-#display(evaluations)
-
-
-    #Array for eval_fitness: [env_class, env_configuration, brain_class, brain_configuration]
-
-    #rewards_training = ep_runner.eval_fitness(evaluations)
-
-    #opt.tell(rewards_training)  --> tell optimizer new rewards
-
-    #best_genome_current_generation = genomes[argmax(rewards_training)]
-
-#Valdiation runs for best genome
-#validation_evaluations = [value = [best_genome_current_generation, index, 1] for index in 1:config.number_validation_runs]
-
-    #rewards_validation = ep_runner.eval_fitness(evaluations)
-
-    #best_reward_current_generation = mean(rewards_validation)
-    #        if best_reward_current_generation > best_reward_overall
-    #        best_genome_overall = best_genome_current_generation
-    #        best_reward_overall = best_reward_current_generation 
-    #end
-
-    #get  elapsed time of current generation
-
-
-    #write Log
