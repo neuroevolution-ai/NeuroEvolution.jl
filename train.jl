@@ -5,6 +5,7 @@ using CUDA
 using BenchmarkTools
 using StaticArrays
 using Adapt
+using Random
 
 include("brains/brain.jl")
 include("environments/environment.jl")
@@ -31,7 +32,7 @@ function kernel_eval_fitness(individuals,V,W,T,input)#,individuals,env_seed,numb
     tx= threadIdx().x
     v_size = 6*50 # input_size * number_neurons
     w_size = 50*50 # number_neurons * number_neurons
-    number_rounds = 5
+    number_rounds = 20
     number_neurons = 50
     input_size = 6
     output_size = 2
@@ -42,34 +43,93 @@ function kernel_eval_fitness(individuals,V,W,T,input)#,individuals,env_seed,numb
 
     #Fill V,W,T with genome data
     #####################################################
-    for i in 1:6 #range(1:input_size)
-        @inbounds V[tx,i] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
-        #@cuprintln("KoordinateV:",tx,";",i,":",V[tx,i])
+    for i in 1:input_size #range(1:input_size)
+        @inbounds V[tx,i,blockIdx().x] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
+        #@cuprintln("KoordinateV:",tx,";",i,";",blockIdx().x,":",V[tx,i,blockIdx().x]," Genom:",individuals[blockIdx().x,i+((tx-1)*input_size)])
     end
-    for i in 1:50 #range(1:number_neurons)
-        @inbounds W[tx,i] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
+    for i in 1:number_neurons #range(1:number_neurons)
+        @inbounds W[tx,i,blockIdx().x] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
         #@cuprintln("KoordinateW:",tx,";",i,":",W[tx,i])
     end
-    for i in 1:2 #range(1:output_size)
-        @inbounds T[i,tx] = individuals[blockIdx().x,v_size+w_size+(tx+((i-1)*number_neurons))] #tx * output_size
+    for i in 1:output_size #range(1:output_size)
+        @inbounds T[i,tx,blockIdx().x] = individuals[blockIdx().x,v_size+w_size+(tx+((i-1)*number_neurons))] #tx * output_size
         #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
     end
     #####################################################
-    sync_threads()
 
 
     x = @cuStaticSharedMem(Float32,number_neurons)
     x[threadIdx().x]= 0.0f0
-    sync_threads()
     temp_V = @cuStaticSharedMem(Float32,number_neurons)
     temp_W = @cuStaticSharedMem(Float32,number_neurons)
     temp_T = @cuStaticSharedMem(Float32,output_size)
 
+    #environment variables
+    #####################################################
+    maze = @cuStaticSharedMem(Int32,(5,5,4))
+    maze_columns = 5
+    maze_rows = 5
+    point_radius = 8
+    agent_radius = 12
+    agent_movement_radius = 10.0f0
+    reward_per_collected_positive_point = 500.0f0
+    reward_per_collected_negative_point = -700.0f0
+    ####################################################
+
     #fitness_total = 0
+    sync_threads()
     #Loop through Rounds
     #####################################################
     for j in 1:number_rounds
+        #observation = @cuStaticSharedMem(Float32,6)
         #fitness_current = 0
+
+        #=
+        #setup Environment
+        #################################################
+        x= 1
+        y= 1
+        total_amount_of_cells = maze_columns*maze_rows
+        amount_of_cells_visited = 1
+        cell_stack = @cuStaticSharedMem(Int32,total_amount_of_cells)
+        cell_stack_index = 1
+        #last_visited_cell_x = 1
+        #last_visited_cell_y = 1
+        random_state = Random.seed!(1234)
+        
+        while nv < n
+            #step1: find all neighboring cells which have not been visited yet
+                function find_neighbours(x,y)
+
+                end
+            #step1.5: check if a cell has all walls
+                function has_all_walls(x,y)
+                    for i in 1:4
+                        if maze[x,y,i] == 0
+                            return false
+                        end
+                    end
+                    return true
+                end
+            #########################################
+
+            #step2: if there are no neighbors then backtrack to last visited cell
+
+            #step3: choose random neighbor through Random state
+
+            #step4: knock down the wall between the cells for both cells
+
+            #step5: add origin cell to stack
+
+            #step6: set coordinates to new cell
+
+            nv = nv+1
+        end
+
+        #################################################
+        #environment finished
+        =#
+
         #Loop through Timesteps
         #################################################
         for index in 1:number_timesteps
@@ -79,33 +139,35 @@ function kernel_eval_fitness(individuals,V,W,T,input)#,individuals,env_seed,numb
             #V*input matmul:
             V_value = 0.0f0
             for i = 1:input_size 
-                    @inbounds V_value = V[tx, i] * input[i] + V_value
+                @inbounds V_value = V[tx, i,blockIdx().x] * input[i] + V_value
+                #@cuprintln(V_value)
             end
-            #@inbounds temp_V[tx] = V_value
             @inbounds temp_V[tx] = tanh(V_value) #find faster option for this step
-            #@cuprintln(temp_V[tx])
-            sync_threads()
+
+            #sync_threads()
 
             #W*temp_V matmul:
             W_value = 0.0f0
             for i = 1:number_neurons 
-                @inbounds W_value = W[tx, i] * temp_V[i] + W_value
+                @inbounds W_value = W[tx, i,blockIdx().x] * temp_V[i] + W_value
             end
-            #@inbounds x[tx] = W_value
+
             @inbounds x[tx] = x[tx] + (delta_t * W_value)
-            #@cuprintln(temp_W[tx])
+            #@cuprintln(x[tx])
             x[tx] = clamp(x[tx],-clipping_range,clipping_range)
+
             sync_threads()
             #T*temp_W matmul:
             if tx <= output_size
                 T_value = 0.0f0
-                for i in 1:number_neurons
-                    @inbounds T_value =T[i,tx] * temp_W[i]
+                for i in 1:output_size
+                    @inbounds T_value = T_value + T[i,tx,blockIdx().x] * x[i]
                 end
-                @inbounds temp_T[tx] = T_value
-                #@inbounds temp_T[tx] = tanh(T_value)
-                #@cuprintln(temp_T[tx])
+
+                @inbounds temp_T[tx] = tanh(T_value)
+
             end
+
             #############################################
             #end of Brain step()
             sync_threads()
@@ -149,16 +211,7 @@ function main()
     config = TrainingCfg(number_generations, number_validation_runs, number_rounds,maximum_env_seed,environment,brain,optimizer, -1)
     b = generate_brain_state(6,2,brain)
     a = get_individual_size(6,2,brain,generate_brain_state(6,2,brain))
-    #display(a)
 
-    #environment_class = get_environment_class(config.environment["type"])
-
-    #brain_class = get_brain_class(config.brain["type"])
-
-    #optimizer_class = get_optimizer_class(config.optimizer["type"])
-
-    #display(environment)
-    #episode_runner = EpisodeRunner()
     optimizer = inititalize_optimizer(a)
 
     #get start time of training and Date
@@ -167,26 +220,45 @@ function main()
     best_reward_overall = typemin(Int32)
 
     for generation in 1:config.number_generations
+        env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
 
-        individuals = fill(0.0f0,112,2900)
+        individuals = fill(0.0f0,112,2900) # number_individuals, free_parameters
         genomes = convert(Array{Array{Float32}},ask(optimizer))
         for i in 1:(size(genomes,1))
             for j in 1:(size(genomes[1],1))
                 individuals[i,j] = (genomes[i])[j]
             end
         end
-        #env_seed = Random.rand((config.number_validation_runs:config.maximum_env_seed), 1)
         #evaluations = [value = [genome, env_seed, config.number_rounds] for genome in genomes]
-        V = CUDA.fill(0.0f0,50,6)
-        W = CUDA.fill(0.0f0,50,50)
-        T = CUDA.fill(0.0f0,2,50)
+
+        V = CUDA.fill(0.0f0,50,6,112)
+        W = CUDA.fill(0.0f0,50,50,112)
+        T = CUDA.fill(0.0f0,2,50,112)
+        x = CUDA.fill(0.0f0,50,112)
         input = CUDA.fill(1.0f0,6)
+        rewards_training = CUDA.fill(0,112)
         individuals_gpu = CuArray(individuals)
         @cuda threads=50 blocks=112 kernel_eval_fitness(individuals_gpu,V,W,T,input)#,input)#,individuals,1,5)
         CUDA.synchronize()
-        #display(V)
 
+        #opt.tell(rewards_training)
 
+        #best_genome_current_generation = genomes[findmax(rewards_training)]
+
+        #rewards_validation = 
+        for i in 1:number_validation_runs
+            #env_seed = i
+            #number_rounds = 1
+            #@cuda threads=50 blocks=number_validation_runs kernel_eval_fitness(best_genome_current_generation,V,W,T,input)
+        end
+        CUDA.synchronize()
+        #=
+        best_reward_current_generation = mean(rewards_validation)
+        if best_reward_current_generation > best_reward_overall
+            best_genome_overall = best_genome_current_generation
+            best_reward_overall = best_reward_current_generation
+        end
+        =#
     end
 
 end
@@ -198,8 +270,6 @@ end
 main()
 #display(T)
 #print("Finished")
-#main()
-
 
 
 #A = CuArray(1:2900)
