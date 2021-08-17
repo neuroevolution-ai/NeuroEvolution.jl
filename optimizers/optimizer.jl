@@ -5,11 +5,11 @@ using PyCall
 using Conda
 using JSON
 
-function inititalize_optimizer(individual_size)#arguments: indiviual size // optimizer.config
+function inititalize_optimizer(individual_size,configuration)#arguments: indiviual size // optimizer.config
     scriptdir = @__DIR__
     pushfirst!(PyVector(pyimport("sys")."path"), scriptdir)
     optimizer = pyimport("cma_es_deap")
-    opt = optimizer.OptimizerCmaEsDeap(individual_size,Dict("A"=>1, "B"=>2))
+    opt = optimizer.OptimizerCmaEsDeap(individual_size,configuration)
     return opt
 end
 

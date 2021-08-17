@@ -156,9 +156,9 @@ end
 function generate_brain_state(input_size,output_size,configuration::Dict)
     #config = ContinuousTimeRNNCfg(value for (key,value) in configuration)
 
-    v_mask = _generate_mask(50, input_size)
-    w_mask = _generate_mask(50, 50)
-    t_mask = _generate_mask(output_size, 50)
+    v_mask = _generate_mask(configuration["number_neurons"], input_size)
+    w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
+    t_mask = _generate_mask(output_size, configuration["number_neurons"])
 
     return get_brain_state_from_masks(v_mask,w_mask,t_mask)
 end
