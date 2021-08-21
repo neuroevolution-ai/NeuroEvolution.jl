@@ -97,12 +97,12 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     x_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array))
     y_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack))
     neighbours = @cuDynamicSharedMem(Int32,4,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack)+sizeof(y_coordinate_stack))
-    #agent_x_coordinate = 200
-    #agent_y_coordinate = 200
-    #positive_point_x_coordinate = 200
-    #positive_point_y_coordinate = 200
-    #negative_point_x_coordinate = 200
-    #negative_point_y_coordinate = 200
+    agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+            agent_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+            positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+            positive_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+            negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+            negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
     ####################################################
 
     #fitness_total = 0
@@ -258,35 +258,36 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
         end
         sync_threads()
         #positive_point_coordinates = 
+        =#
         ############
         #################################################
         #environment finished
             if tx == 1
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_width)
+            input[tx] = convert(Float32,agent_x_coordinate / screen_width)
             #@cuprintln(input[tx])
             end
             if tx == 2
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_height)
+            input[tx] = convert(Float32,agent_y_coordinate / screen_height)
             #@cuprintln(input[tx])
             end
             #sensor data
             if tx == 3
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_width)
+            input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
             #@cuprintln(input[tx])
             end
             if tx == 4
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_height)
+            input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
             #@cuprintln(input[tx])
             end
             if tx == 5
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_width)
+            input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
             #@cuprintln(input[tx])
             end
             if tx == 6
-            input[tx] = convert(Float32,maze_objects_array[tx] / screen_height)
+            input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
             #@cuprintln(input[tx])
             end
-        =#
+
         #if tx <= 6
         #@inbounds @cuprintln(input[tx])
         #end
@@ -346,56 +347,52 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
             sync_threads()
             #env step()
             #############################################
-            #=
-
-            #Move agent
-        
-            #@cuprintln("Block: ",blockIdx().x," Davor:",agent_x_coordinate)
-        
-            agent_x_coordinate = convert(Int32,agent_x_coordinate + clamp(floor(action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius))
+            if tx == 1
+            agent_x_coordinate += clamp(floor(action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
-            agent_y_coordinate = agent_y_coordinate + clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-           
+            agent_y_coordinate +=  clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+            
             #@cuprintln("Block: ",blockIdx().x," Danach:",agent_x_coordinate)
             #@cuprintln(floor(action[1] * agent_movement_radius))
-            sync_threads()
+            #sync_threads()
             # Check agent collisions with outer walls
             agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
             agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
             agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
             agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
-            #@cuprintln(agent_x_coordinate)
-            #@cuprintln(agent_y_coordinate)
+            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
+            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             # Get cell indizes of agents current position
-            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-            #@cuprintln(cell_x)
-            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
-            #@cuprintln(cell_y)
 
+            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+
+            
             # Get coordinates of current cell
-            x_left = maze_cell_size * cell_x
-            x_right = maze_cell_size * (cell_x + 1)
+            x_left = maze_cell_size * (cell_x - 1)
+            x_right = maze_cell_size * cell_x
+            y_bottom = maze_cell_size * (cell_y - 1)
             y_top = maze_cell_size * cell_y
-            y_bottom = maze_cell_size * (cell_y + 1)
             #@cuprintln(agent_y_coordinate)
             # Check agent collisions with maze walls
 
-            if maze[cell_x,cell_y,1] == 1 #check for Northern Wall
-                agent_y_coordinate = max(agent_y_coordinate,y_top + agent_radius)
+            if maze[cell_y,cell_x,1] == 0 #check for Northern Wall
+                agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
             end
             #@cuprintln(agent_y_coordinate)
-            if maze[cell_x,cell_y,3] == 1 #check for Southern Wall
-                agent_y_coordinate = min(agent_y_coordinate,y_bottom - agent_radius)
+            if maze[cell_y,cell_x,3] == 0 #check for Southern Wall
+                agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
             end
-            if maze[cell_x,cell_y,2] == 1 #check for Eastern Wall
-                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
-            end
-
-            if maze[cell_x,cell_y,4] == 1 #check for Western Wall
+            if maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
                 agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
             end
+
+            if maze[cell_y,cell_x,4] == 0 #check for Western Wall
+                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
+            end
             # Check agent collision with top-left edge (prevents sneaking through the edge)
-            
+            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
+            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
                 agent_x_coordinate = x_left + agent_radius
                 agent_y_coordinate = y_top + agent_radius
@@ -418,7 +415,7 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
                 agent_x_coordinate = x_left + agent_radius
                 agent_y_coordinate = y_bottom + agent_radius
             end
-
+            
             #get sensor signals
             #
             #
@@ -444,46 +441,33 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
                 rew = reward_per_collected_negative_point
             end
 
+            
 
             #end
-            sync_threads()
+            #sync_threads()
             #get state of environment as Input for Brain
             #############################################
             
-            if tx == 1
-            input[tx] = convert(Float32,agent_x_coordinate / screen_width)
-            end
-            if tx == 2
-            input[tx] = convert(Float32,agent_y_coordinate / screen_height)
-            end
-            #sensor data
-            if tx == 3
-            input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
-            end
-            if tx == 4
-            input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
-            end
-            if tx == 5
-            input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
-            end
-            if tx == 6
-            input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
-            end
-            
-            #############################################
-            sync_threads()
-
-            #Accumulate fitness
-            #############################################
-            #fitness_current += reward 
-            #############################################
-            sync_threads()
-            #if tx <= output_size
-            #@inbounds action[tx] = 0.0f0
+            #if tx == 1
+            input[1] = convert(Float32,agent_x_coordinate / screen_width)
             #end
-
-
-            =#
+            #if tx == 2
+            input[2] = convert(Float32,agent_y_coordinate / screen_height)
+            #end
+            #sensor data
+            #if tx == 3
+            input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
+            #end
+            #if tx == 4
+            input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
+            #end
+            #if tx == 5
+            input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
+            #end
+            #if tx == 6
+            input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
+            end
+            sync_threads()
         end
 
         ####################################################
@@ -496,16 +480,18 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     return
 end
 
-function kernel_env_step(action,input)
+function kernel_env_step(action,input, maze)
             tx = threadIdx().x
             #env step()
             #############################################
+            for timestep in 1:1000
             if tx == 1
             maze_columns = 5
             maze_rows = 5
             agent_radius = 12
             maze_cell_size = 80
             agent_movement_radius = 10.0f0
+            point_radius = 10
             screen_height = maze_cell_size * maze_rows
             screen_width = maze_cell_size * maze_columns
             agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
@@ -516,8 +502,7 @@ function kernel_env_step(action,input)
             negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
             reward_per_collected_positive_point = 500.00f0
             reward_per_collected_negative_point = -700.00f0
-            @cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            @cuprintln("agent_y_coordinate:",agent_y_coordinate)
+
             #Move agent
         
             #@cuprintln("Block: ",blockIdx().x," Davor:",agent_x_coordinate)
@@ -525,8 +510,6 @@ function kernel_env_step(action,input)
             agent_x_coordinate += clamp(floor(action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
             agent_y_coordinate +=  clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-            @cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            @cuprintln("agent_y_coordinate:",agent_y_coordinate)
             
             #@cuprintln("Block: ",blockIdx().x," Danach:",agent_x_coordinate)
             #@cuprintln(floor(action[1] * agent_movement_radius))
@@ -536,39 +519,39 @@ function kernel_env_step(action,input)
             agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
             agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
             agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
-            @cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            @cuprintln("agent_y_coordinate:",agent_y_coordinate)
+            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
+            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             # Get cell indizes of agents current position
-            #=
-            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-            #@cuprintln(cell_x)
-            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
-            #@cuprintln(cell_y)
 
+            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+
+            
             # Get coordinates of current cell
-            x_left = maze_cell_size * cell_x
-            x_right = maze_cell_size * (cell_x + 1)
+            x_left = maze_cell_size * (cell_x - 1)
+            x_right = maze_cell_size * cell_x
+            y_bottom = maze_cell_size * (cell_y - 1)
             y_top = maze_cell_size * cell_y
-            y_bottom = maze_cell_size * (cell_y + 1)
             #@cuprintln(agent_y_coordinate)
             # Check agent collisions with maze walls
 
-            if maze[cell_y,cell_x,1] == 1 #check for Northern Wall
-                agent_y_coordinate = max(agent_y_coordinate,y_top + agent_radius)
+            if maze[cell_y,cell_x,1] == 0 #check for Northern Wall
+                agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
             end
             #@cuprintln(agent_y_coordinate)
-            if maze[cell_y,cell_x,3] == 1 #check for Southern Wall
-                agent_y_coordinate = min(agent_y_coordinate,y_bottom - agent_radius)
+            if maze[cell_y,cell_x,3] == 0 #check for Southern Wall
+                agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
             end
-            if maze[cell_y,cell_x,2] == 1 #check for Eastern Wall
-                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
-            end
-
-            if maze[cell_y,cell_x,4] == 1 #check for Western Wall
+            if maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
                 agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
             end
+
+            if maze[cell_y,cell_x,4] == 0 #check for Western Wall
+                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
+            end
             # Check agent collision with top-left edge (prevents sneaking through the edge)
-            
+            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
+            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
                 agent_x_coordinate = x_left + agent_radius
                 agent_y_coordinate = y_top + agent_radius
@@ -591,7 +574,7 @@ function kernel_env_step(action,input)
                 agent_x_coordinate = x_left + agent_radius
                 agent_y_coordinate = y_bottom + agent_radius
             end
-
+            
             #get sensor signals
             #
             #
@@ -617,34 +600,36 @@ function kernel_env_step(action,input)
                 rew = reward_per_collected_negative_point
             end
 
+            
 
             #end
             #sync_threads()
             #get state of environment as Input for Brain
             #############################################
             
-            if tx == 1
-            input[tx] = convert(Float32,agent_x_coordinate / screen_width)
-            end
-            if tx == 2
-            input[tx] = convert(Float32,agent_y_coordinate / screen_height)
-            end
+            #if tx == 1
+            input[1] = convert(Float32,agent_x_coordinate / screen_width)
+            #end
+            #if tx == 2
+            input[2] = convert(Float32,agent_y_coordinate / screen_height)
+            #end
             #sensor data
-            if tx == 3
-            input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
-            end
-            if tx == 4
-            input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
-            end
-            if tx == 5
-            input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
-            end
-            if tx == 6
-            input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
-            end
+            #if tx == 3
+            input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
+            #end
+            #if tx == 4
+            input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
+            #end
+            #if tx == 5
+            input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
+            #end
+            #if tx == 6
+            input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
+            #end
             
             #############################################
-            =#
+            
+    end
     end
     return
 end
@@ -867,10 +852,13 @@ function main()
         #display(maze_cpu)
         maze = CuArray(maze_cpu)
 
-        @cuda threads=1 blocks=1 kernel_env_step(input,action)
-        #@cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu)#,input)#,input)#,individuals,1,5)
+        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu)#,input)#,input)#,individuals,1,5)
         #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
+
         CUDA.synchronize()
+       # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
+        CUDA.synchronize()
+        #display(input)
         #display(maze)
         #opt.tell(rewards_training)
 
