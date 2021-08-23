@@ -1,10 +1,8 @@
 using JSON
 using Random
-using Statistics
 using CUDA
 using BenchmarkTools
-using StaticArrays
-using Adapt
+
 
 include("brains/brain.jl")
 include("environments/environment.jl")
@@ -13,10 +11,8 @@ include("optimizers/optimizer.jl")
 
 
 #Environment function
-function place_randomly_in_maze
-end
 
-function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_rounds)
+function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,number_rounds)
     #Dynamic Memory necessary to be allotted: sizeof(Float32) * (number_neurons * input_size + number_neurons * number_neurons + number_neurons * output_size + input_size + number_neurons + number_neurons + output_size) + sizeof(Int32) * (maze_columns * maze_rows * 4 + 12 + maze_columns * maze_rows + 4)
     #Init Variables
     #####################################################
@@ -32,6 +28,7 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     number_timesteps = 1000
     clipping_range = 1.0f0
     alpha = 0.0f0
+    fitness_total = 0
 
     #####################################################
     #=
@@ -44,11 +41,8 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     W = @cuDynamicSharedMem(Float32,(number_neurons,number_neurons),sizeof(V))
     T = @cuDynamicSharedMem(Float32,(output_size,number_neurons),sizeof(V)+sizeof(W))
     input = @cuDynamicSharedMem(Float32,input_size,sizeof(V)+sizeof(W)+sizeof(T))
-    if tx <= 6
-    @inbounds input[tx] = 1.0f0
-    end
-    #@cuprintln(T[1])
-    
+
+  
     
     #Fill V,W,T with genome data
     #####################################################
@@ -69,7 +63,7 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
 
     #x = @cuStaticSharedMem(Float32,number_neurons)
     x = @cuDynamicSharedMem(Float32,number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input))
-    x[tx]= 0.0f0
+    #x[tx]= 0.0f0
     #temp_V = @cuStaticSharedMem(Float32,number_neurons)
     #temp_W = @cuStaticSharedMem(Float32,number_neurons)
     #action = @cuStaticSharedMem(Float32,output_size)
@@ -97,12 +91,6 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     x_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array))
     y_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack))
     neighbours = @cuDynamicSharedMem(Int32,4,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack)+sizeof(y_coordinate_stack))
-    agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-            agent_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-            positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-            positive_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-            negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-            negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
     ####################################################
 
     #fitness_total = 0
@@ -110,25 +98,36 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
     #Loop through Rounds
     #####################################################
     for j in 1:number_rounds
-        #fitness_current = 0
-        
+        fitness_current = 0
 
+        agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+
+        agent_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+
+        positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+
+        positive_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+
+        negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+
+        negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+        sync_threads
         #setup Environment
         #################################################
         cell_x_coordinate = 1
         cell_y_coordinate = 1
         amount_of_cells_visited = 1
         cell_stack_index = 1
-                if tx == 1
+        if tx == 1
             for j in 1:4
-            for k in 1:5
-            for l in 1:5
-            maze[l,k,j] = convert(Int32,0)
-            end
-            end
+                for k in 1:5
+                    for l in 1:5
+                        maze[l,k,j] = convert(Int32,0)
+                    end
+                end
             end
     
-    while amount_of_cells_visited < total_amount_of_cells
+        while amount_of_cells_visited < total_amount_of_cells
             for i in 1:4
                 neighbours[i] = 0
             end
@@ -157,7 +156,6 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
                         neighbours[3] = 0
                     end
                 end
-                #@cuprintln("Field:",3," Value:",neighbours[3])
                 if  (cell_y_coordinate - 1) >= 1
                     if maze[cell_y_coordinate-1,cell_x_coordinate,1] == 0 && maze[cell_y_coordinate-1,cell_x_coordinate,2] == 0 && maze[cell_y_coordinate-1,cell_x_coordinate,3] == 0 && maze[cell_y_coordinate-1,cell_x_coordinate,4] == 0
                         neighbours[4] = 1
@@ -165,8 +163,6 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
                         neighbours[4] = 0
                     end
                 end
-                #@cuprintln("Field:",4," Value:",neighbours[4])
-                    #@cuprintln("N:",neighbours[3]," E:",neighbours[2]," S:",neighbours[4]," W:",neighbours[1])
             if neighbours[1] == 0 && neighbours[2] == 0 && neighbours[3] == 0 && neighbours[4] == 0
                     cell_stack_index = cell_stack_index - 1
                     cell_x_coordinate = x_coordinate_stack[cell_stack_index]
@@ -233,22 +229,21 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
             cell_x_coordinate = cell_x_coordinate + move_x_coordinate
             cell_y_coordinate = cell_y_coordinate + move_y_coordinate
             #@cuprintln("Iteration done!")
-    amount_of_cells_visited = amount_of_cells_visited +1
+            amount_of_cells_visited = amount_of_cells_visited +1
 
-    end
+        end
     
-    end
-
+        end
 
         #####################################################
-#=
+        #=
         #Maze created
 
         #Setup Rest
         ############
         #Place agent randomly in maze
 
-    # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate,cell_x,cell_y,x_left,x_right,y_top,y_bottom]
+        # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate,cell_x,cell_y,x_left,x_right,y_top,y_bottom]
 
         if tx == 1 || tx == 3 || tx == 5 
             @inbounds maze_objects_array[tx] = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns) + 1) * maze_cell_size)
@@ -284,10 +279,9 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
             #@cuprintln(input[tx])
             end
             if tx == 6
-            input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
             end
-
+            sync_threads()
         #if tx <= 6
         #@inbounds @cuprintln(input[tx])
         #end
@@ -299,13 +293,9 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
             #############################################
             #V*input matmul:
             V_value = 0.0f0
-            if tx == 1 && blockIdx().x == 1
-            end
             for i = 1:input_size 
                 @inbounds V_value += V[tx, i] * input[i] #+ V_value
-                if tx == 1 && blockIdx().x == 1
-                #@cuprintln("Thread:",tx," V_Element:",V[tx, i]," * input:",input[i]," + V_Value = ",V_value)
-                end
+
             end
 
             @inbounds temp_V[tx] = tanh(x[tx] + V_value) #find faster option for this step
@@ -352,8 +342,7 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
          
             agent_y_coordinate +=  clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
-            #@cuprintln("Block: ",blockIdx().x," Danach:",agent_x_coordinate)
-            #@cuprintln(floor(action[1] * agent_movement_radius))
+
             #sync_threads()
             # Check agent collisions with outer walls
             agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
@@ -466,17 +455,27 @@ function kernel_eval_fitness(individuals)# input)#,individuals,env_seed,number_r
             #end
             #if tx == 6
             input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
-            end
+            #end
+
+
+            fitness_current += rew
             sync_threads()
+            end
         end
 
         ####################################################
         #end of Timestep
+        if tx == 1
+        fitness_total += fitness_current
+        end
         sync_threads()
+
     end
     ######################################################
     #end of Round
-
+    if tx == 1
+    results[blockIdx().x] = fitness_total / number_rounds
+    end
     return
 end
 
@@ -797,9 +796,13 @@ function kernel_create_maze(maze)
 end
 
 function kernel_random(env_seed)
-    r_state = Random.seed!(env_seed)
-    test = CUDA.rand(r_state,Int32)
-    @cuprintln(test)
+    #if threadIdx().x == 1
+    #random_state = Random.default_rng()
+    Random.seed!(Random.default_rng(),env_seed+blockIdx().x)
+    #end
+    #sync_threads()
+    test = rand(Int32)
+    @cuprintln("Block:",blockIdx().x," Thread:", threadIdx().x ," Result:",test)
     return
 end
 
@@ -829,7 +832,7 @@ function main()
     #@device_code_warntype @cuda threads=10 kernel_random(10)
     #return
     #get start time of training and Date
-
+    #@cuda threads=5 blocks=5 kernel_random(1000)
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
 
@@ -851,16 +854,17 @@ function main()
         maze_cpu = fill(convert(Int32,0),(5,5,4))
         #display(maze_cpu)
         maze = CuArray(maze_cpu)
+        fitness_results = CUDA.fill(0f0,112)
 
-        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu)#,input)#,input)#,individuals,1,5)
+        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results)
         #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
-
         CUDA.synchronize()
        # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
-        CUDA.synchronize()
-        #display(input)
+        #display(fitness_results)
         #display(maze)
-        #opt.tell(rewards_training)
+       rewards_training = Array(fitness_results)
+       #display(rewards_training)
+       tell(optimizer,rewards_training)
 
         #best_genome_current_generation = genomes[findmax(rewards_training)]
 

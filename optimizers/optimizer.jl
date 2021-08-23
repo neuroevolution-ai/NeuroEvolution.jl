@@ -20,25 +20,6 @@ end
 function tell(optimizer, rewards)
     return optimizer.tell(rewards)
 end
-#optimizer = inititalize_optimizer()
-#print(optimizer.ask())
-
-#opt = optimizer.OptimizerCmaEsDeap(100,config)
-#print(opt.ask())
-#opt = optimizer.OptimizerCma(100)
-#print(opt.ask2())
-#creator = pyimport("deap.creator")
-#base = pyimport("deap.base")
-#cma = pyimport("deap.cma")
-#array = pyimport("array")
-#np = pyimport("numpy")
-###
-
-
-#cma_es_deap.py implementieren
-#function get_optimizer_class(input:: AbstractString)
-#    return input
-#end
 
 
 
