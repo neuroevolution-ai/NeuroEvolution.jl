@@ -8,6 +8,6 @@
     "\\tests",
     "\\tools"
   ],
-  "SelectedNode": "\\environments\\collect_points_env.jl",
+  "SelectedNode": "\\optimizers\\optimizer.jl",
   "PreviewInSolutionExplorer": false
 }

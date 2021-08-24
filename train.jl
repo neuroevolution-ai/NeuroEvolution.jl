@@ -2,9 +2,11 @@ using JSON
 using Random
 using CUDA
 using BenchmarkTools
+using Statistics
 
 
 include("brains/brain.jl")
+include("brains/continuous_time_rnn.jl")
 include("environments/environment.jl")
 include("optimizers/optimizer.jl")
 #include("tools/episode_runner.jl")
@@ -12,7 +14,7 @@ include("optimizers/optimizer.jl")
 
 #Environment function
 
-function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,number_rounds)
+function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals,env_seed,number_rounds)
     #Dynamic Memory necessary to be allotted: sizeof(Float32) * (number_neurons * input_size + number_neurons * number_neurons + number_neurons * output_size + input_size + number_neurons + number_neurons + output_size) + sizeof(Int32) * (maze_columns * maze_rows * 4 + 12 + maze_columns * maze_rows + 4)
     #Init Variables
     #####################################################
@@ -29,13 +31,10 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
     clipping_range = 1.0f0
     alpha = 0.0f0
     fitness_total = 0
-
+    if threadIdx().x == 1
+    Random.seed!(Random.default_rng(),env_seed[1])
+    end
     #####################################################
-    #=
-    V = @cuStaticSharedMem(Float32,(number_neurons,input_size))
-    W = @cuStaticSharedMem(Float32,(number_neurons,number_neurons),sizeof(V))
-    T = @cuStaticSharedMem(Float32,(output_size,number_neurons),sizeof(V)+sizeof(W))
-    =#
     #offset = 0
     V = @cuDynamicSharedMem(Float32,(number_neurons,input_size))
     W = @cuDynamicSharedMem(Float32,(number_neurons,number_neurons),sizeof(V))
@@ -43,7 +42,8 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
     input = @cuDynamicSharedMem(Float32,input_size,sizeof(V)+sizeof(W)+sizeof(T))
 
   
-    
+    brain_initialize(tx,blockIdx().x,V,W,T,individuals)
+    #=
     #Fill V,W,T with genome data
     #####################################################
     for i in 1:input_size #range(1:input_size)
@@ -59,6 +59,7 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
         #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
     end
     #####################################################
+    =#
     sync_threads()
 
     #x = @cuStaticSharedMem(Float32,number_neurons)
@@ -291,13 +292,15 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
 
             #Brain step()
             #############################################
+            brain_step(tx,temp_V, V, W, T, x, input, action,alpha,delta_t,clipping_range)
+
+            #=
             #V*input matmul:
+
             V_value = 0.0f0
             for i = 1:input_size 
                 @inbounds V_value += V[tx, i] * input[i] #+ V_value
-
             end
-
             @inbounds temp_V[tx] = tanh(x[tx] + V_value) #find faster option for this step
             sync_threads()
             #W*temp_V matmul:
@@ -308,30 +311,15 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
             @inbounds x[tx] += (delta_t * ((-alpha * x[tx]) + W_value))
             @inbounds x[tx] = clamp(x[tx],-clipping_range,clipping_range)
             sync_threads()
-
-
             #T*temp_W matmul:
-            #=
-                T_value = 0.0f0
-                for i in 1:output_size
-                   @inbounds @atomic action[i] +=  T[i,tx] * x[i]
-
-                end
-                if tx <= 2
-                @inbounds action[tx] = tanh(action[tx])
-                end
-                =#
-            
             if tx <= output_size
                 T_value = 0.0f0
                 for i in 1:number_neurons
-                   @inbounds T_value = T_value + T[tx,i] * x[i]
+                   @inbounds T_value +=T[tx,i] * x[i]
                 end
                 @inbounds action[tx] = tanh(T_value)
             end
-            
-
-
+            =#
             #############################################
             #end of Brain step()
             sync_threads()
@@ -380,8 +368,6 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
                 agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
             end
             # Check agent collision with top-left edge (prevents sneaking through the edge)
-            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
                 agent_x_coordinate = x_left + agent_radius
                 agent_y_coordinate = y_top + agent_radius
@@ -417,16 +403,16 @@ function kernel_eval_fitness(individuals,results)# input)#,individuals,env_seed,
             distance = sqrt((positive_point_x_coordinate - agent_x_coordinate) ^ 2 + (positive_point_y_coordinate - agent_y_coordinate) ^ 2)
             if distance <= point_radius + agent_radius
                 #place new positive_point randomly in maze
-                #
-                #
+                positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+                positive_point_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
                 rew = reward_per_collected_positive_point
             end
             # Collect negative point in reach
             distance = sqrt((negative_point_x_coordinate - agent_x_coordinate) ^ 2 + (negative_point_y_coordinate - agent_y_coordinate) ^ 2)
             if distance <= point_radius + agent_radius
                 #place new negative_point randomly in maze
-                #
-                #
+                negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+                negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
                 rew = reward_per_collected_negative_point
             end
 
@@ -796,10 +782,9 @@ function kernel_create_maze(maze)
 end
 
 function kernel_random(env_seed)
-    #if threadIdx().x == 1
-    #random_state = Random.default_rng()
+    if threadIdx().x == 1
     Random.seed!(Random.default_rng(),env_seed+blockIdx().x)
-    #end
+    end
     #sync_threads()
     test = rand(Int32)
     @cuprintln("Block:",blockIdx().x," Thread:", threadIdx().x ," Result:",test)
@@ -855,15 +840,16 @@ function main()
         #display(maze_cpu)
         maze = CuArray(maze_cpu)
         fitness_results = CUDA.fill(0f0,112)
-
-        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results)
+        println("start Generation:",generation)
+        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed))
         #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
         CUDA.synchronize()
+        println("finished Generation:",generation)
        # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
         #display(fitness_results)
         #display(maze)
        rewards_training = Array(fitness_results)
-       #display(rewards_training)
+       #display(mean(rewards_training))
        tell(optimizer,rewards_training)
 
         #best_genome_current_generation = genomes[findmax(rewards_training)]

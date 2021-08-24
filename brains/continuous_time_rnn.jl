@@ -1,34 +1,38 @@
-
-function brain_initialize(threadID, V, W, T, individual)
+import Test
+function brain_initialize(threadID,blockID, V, W, T, individuals)
+    number_neurons = size(W,1)
+    input_size = size(V,2)
+    output_size = size(T,1)
+    v_size = input_size * number_neurons
+    w_size = number_neurons * number_neurons
     #Fill V,W,T with genome data
     #####################################################
-    for i in 1:input_size #range(1:input_size)
-        @inbounds V[tx,i] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
-        #@cuprintln("KoordinateV:",tx,";",i,";",blockIdx().x,":",V[tx,i,blockIdx().x]," Genom:",individuals[blockIdx().x,i+((tx-1)*input_size)])
+    for i in 1:input_size
+        @inbounds V[threadID,i] = individuals[blockID,i+((threadID-1)*input_size)]  
     end
-    for i in 1:number_neurons #range(1:number_neurons)
-        @inbounds W[tx,i] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
-        #@cuprintln("KoordinateW:",tx,";",i,":",W[tx,i])
+    sync_threads()
+    for i in 1:number_neurons
+        @inbounds W[threadID,i] = individuals[blockID,v_size+(i+((threadID-1)*number_neurons))]
     end
-    for i in 1:output_size #range(1:output_size)
-        @inbounds T[i,tx] = individuals[blockIdx().x,v_size+w_size+(tx+((i-1)*number_neurons))] #tx * output_size
-        #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
+    for i in 1:output_size
+        @inbounds T[i,threadID] = individuals[blockID,v_size+w_size+(threadID+((i-1)*number_neurons))]
     end
     #####################################################
 end
 
-function brain_step(threadID, temp_V, V, W, T, x, input, action)
- #Brain step()
-            #############################################
+function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,clipping_range)
+    input_size = size(V,2)
+    output_size = size(T,1)
+    number_neurons = size(W,1)
+
             #V*input matmul:
             V_value = 0.0f0
             for i = 1:input_size 
-                @inbounds V_value += V[threadID, i] * input[i] #+ V_value
+                @inbounds V_value += V[threadID, i] * input[i] 
 
             end
 
-            @inbounds temp_V[threadID] = tanh(x[threadID] + V_value) #find faster option for this step
-            sync_threads()
+            @inbounds temp_V[threadID] = tanh(x[threadID] + V_value) 
             #W*temp_V matmul:
             W_value = 0.0f0
             for i = 1:number_neurons 
@@ -38,18 +42,7 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action)
             @inbounds x[threadID] = clamp(x[threadID],-clipping_range,clipping_range)
             sync_threads()
 
-
             #T*temp_W matmul:
-            #=
-                T_value = 0.0f0
-                for i in 1:output_size
-                   @inbounds @atomic action[i] +=  T[i,tx] * x[i]
-
-                end
-                if tx <= 2
-                @inbounds action[tx] = tanh(action[tx])
-                end
-                =#
             
             if threadID <= output_size
                 T_value = 0.0f0
@@ -59,8 +52,30 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action)
                 @inbounds action[threadID] = tanh(T_value)
             end
             
-
-
-            #############################################
-            #end of Brain step()
+            return
 end
+
+
+#Unit tests
+##################################################################
+#=
+using Test
+#brain_initialize():
+@testset "Initialize Tests" begin
+    number_individuals = 112
+    input_size = 5
+    number_neurons = 25
+    output_size = 2
+    blockID = 1
+    threadID = 1
+    individuals = rand(Float32,(number_individuals,number_neurons^2+input_size*number_neurons+output_size*number_neurons))
+
+#Initialize V
+
+#Initialize W
+
+#Initialize T
+end
+=#
+
+
