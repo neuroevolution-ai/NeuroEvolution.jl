@@ -5,6 +5,7 @@ using BenchmarkTools
 using Statistics
 
 include("optimizers/optimizer.jl")
+include("brains/brain.jl")
 
 
 function kernel_eval_fitness()
