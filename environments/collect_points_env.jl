@@ -1,5 +1,5 @@
 function create_maze()
 end
 
-function env_step()
+function env_step(maze)
 end

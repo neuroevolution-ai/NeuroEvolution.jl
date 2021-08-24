@@ -14,7 +14,7 @@ include("optimizers/optimizer.jl")
 
 #Environment function
 
-function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals,env_seed,number_rounds)
+function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)# input)#,individuals,env_seed,number_rounds)
     #Dynamic Memory necessary to be allotted: sizeof(Float32) * (number_neurons * input_size + number_neurons * number_neurons + number_neurons * output_size + input_size + number_neurons + number_neurons + output_size) + sizeof(Int32) * (maze_columns * maze_rows * 4 + 12 + maze_columns * maze_rows + 4)
     #Init Variables
     #####################################################
@@ -23,7 +23,7 @@ function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals
     bx = blockIdx().x
     v_size = 6*50 # input_size * number_neurons
     w_size = 50*50 # number_neurons * number_neurons
-    number_rounds = 20
+    number_rounds = number_rounds_given[1]
     number_neurons = 50
     input_size = 6
     output_size = 2
@@ -36,6 +36,7 @@ function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals
     end
     #####################################################
     #offset = 0
+
     V = @cuDynamicSharedMem(Float32,(number_neurons,input_size))
     W = @cuDynamicSharedMem(Float32,(number_neurons,number_neurons),sizeof(V))
     T = @cuDynamicSharedMem(Float32,(output_size,number_neurons),sizeof(V)+sizeof(W))
@@ -85,8 +86,8 @@ function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals
     point_radius = 8
     agent_radius = 12
     agent_movement_radius = 10.0f0
-    reward_per_collected_positive_point = 500.0f0
-    reward_per_collected_negative_point = -700.0f0
+    reward_per_collected_positive_point = 500.0f0 # 500.0f0
+    reward_per_collected_negative_point = -700.0f0 # -700.0f0
     maze = @cuDynamicSharedMem(Int32,(5,5,4),sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)) 
     maze_objects_array = @cuDynamicSharedMem(Int32,12,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze))  # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate,cell_x,cell_y,x_left,x_right,y_top,y_bottom]
     x_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array))
@@ -112,7 +113,6 @@ function kernel_eval_fitness(individuals,results, env_seed)# input)#,individuals
         negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
 
         negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-        sync_threads
         #setup Environment
         #################################################
         cell_x_coordinate = 1
@@ -833,34 +833,46 @@ function main()
         end
 
         input = CUDA.fill(1.0f0,6)
-        rewards_training = CUDA.fill(0,number_individuals)
+        rewards_training = CUDA.fill(0f0,number_individuals)
         individuals_gpu = CuArray(individuals) 
         action = CUDA.fill(1.0f0,2)
         maze_cpu = fill(convert(Int32,0),(5,5,4))
         #display(maze_cpu)
         maze = CuArray(maze_cpu)
         fitness_results = CUDA.fill(0f0,112)
+        rounds = CUDA.fill(number_rounds,1)
         println("start Generation:",generation)
-        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed))
+        @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed),rounds)
         #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
         CUDA.synchronize()
         println("finished Generation:",generation)
-       # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
+        # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
         #display(fitness_results)
         #display(maze)
-       rewards_training = Array(fitness_results)
-       #display(mean(rewards_training))
-       tell(optimizer,rewards_training)
+        rewards_training = Array(fitness_results)
 
-        #best_genome_current_generation = genomes[findmax(rewards_training)]
+        tell(optimizer,rewards_training)
 
-        #rewards_validation = 
+        best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
+        #display(best_genome_current_generation)
+
+
+        env_seeds = Array(1:number_validation_runs)
+        number_validation_rounds = 1
+        rewards_validation = CUDA.fill(0f0,number_validation_runs)
+        validation_individuals = fill(0.0f0,number_validation_runs,free_parameters)
         for i in 1:number_validation_runs
-            #env_seed = i
-            number_validation_rounds = 1
-            #@cuda threads=50 blocks=number_validation_runs kernel_eval_fitness(best_genome_current_generation,V,W,T,input)
+            for j in 1:free_parameters
+                validation_individuals[i,j] = best_genome_current_generation[j]
+            end
         end
+        rounds = CUDA.fill(1,1)
+        println("started Validation Generation:",generation)
+        @cuda threads=number_neurons blocks=number_validation_runs shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(CuArray(validation_individuals),rewards_validation, CuArray(env_seeds), rounds)
         CUDA.synchronize()
+        println("finished Validation Generation:",generation)
+        rewards_validation_cpu = Array(rewards_validation)
+        display(mean(rewards_validation_cpu))
 
         #=
         best_reward_current_generation = mean(rewards_validation)

@@ -1,5 +1,6 @@
 import Test
 function brain_initialize(threadID,blockID, V, W, T, individuals)
+
     number_neurons = size(W,1)
     input_size = size(V,2)
     output_size = size(T,1)
@@ -78,4 +79,24 @@ using Test
 end
 =#
 
+#=
+@testset "Step Tests" begin
+V =
+W = 
+T = 
+alpha =
+x1 =
+x2 =
+delta_t = 
+input =
 
+#Comparison
+dx_dt = -alpha * x + W*(tanh(x + (C*input)))
+x1 += delta_t * dx_dt
+x1 = clamp(x,-clipping_range,clipping_range)
+output = tanh(T*x)
+
+#
+brain_step
+end
+=#
