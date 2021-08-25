@@ -257,25 +257,20 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         #environment finished
         #
             if tx == 1
-            input[tx] = convert(Float32,agent_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,agent_x_coordinate / screen_width)
             end
             if tx == 2
-            input[tx] = convert(Float32,agent_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,agent_y_coordinate / screen_height)
             end
             #sensor data
             if tx == 3
-            input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
             end
             if tx == 4
-            input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
             end
             if tx == 5
-            input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
             end
             if tx == 6
                 input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
@@ -342,15 +337,15 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
                 # Get cell indizes of agents current position
                 
-                cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-                cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+                #cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+                #cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
 
             
                 # Get coordinates of current cell
-                x_left = maze_cell_size * (cell_x - 1)
-                x_right = maze_cell_size * cell_x
-                y_bottom = maze_cell_size * (cell_y - 1)
-                y_top = maze_cell_size * cell_y
+                #x_left = maze_cell_size * (cell_x - 1)
+                #x_right = maze_cell_size * cell_x
+                #y_bottom = maze_cell_size * (cell_y - 1)
+                #y_top = maze_cell_size * cell_y
                 #@cuprintln(agent_y_coordinate)
                 # Check agent collisions with maze walls
                 #=
