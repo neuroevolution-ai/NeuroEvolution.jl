@@ -319,9 +319,6 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 end
                 @inbounds action[tx] = tanh(T_value)
             end
-            if tx <= 2
-            @cuprintln(action[tx])
-            end
             #=
             #############################################
             #end of Brain step()
@@ -329,9 +326,9 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #env step()
             #############################################
             if tx == 1
-            agent_x_coordinate += clamp(floor(action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+            agent_x_coordinate += clamp(floor(@inbounds action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
-            agent_y_coordinate +=  clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+            agent_y_coordinate +=  clamp(floor(@inbounds action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
             #sync_threads()
@@ -356,18 +353,18 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #@cuprintln(agent_y_coordinate)
             # Check agent collisions with maze walls
 
-            if maze[cell_y,cell_x,1] == 0 #check for Northern Wall
+            if @inbounds maze[cell_y,cell_x,1] == 0 #check for Northern Wall
                 agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
             end
             #@cuprintln(agent_y_coordinate)
-            if maze[cell_y,cell_x,3] == 0 #check for Southern Wall
+            if @inbounds maze[cell_y,cell_x,3] == 0 #check for Southern Wall
                 agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
             end
-            if maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
+            if @inbounds maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
                 agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
             end
 
-            if maze[cell_y,cell_x,4] == 0 #check for Western Wall
+            if @inbounds maze[cell_y,cell_x,4] == 0 #check for Western Wall
                 agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
             end
             # Check agent collision with top-left edge (prevents sneaking through the edge)
@@ -427,23 +424,23 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #############################################
             
             #if tx == 1
-            input[1] = convert(Float32,agent_x_coordinate / screen_width)
+            @inbounds input[1] = convert(Float32,agent_x_coordinate / screen_width)
             #end
             #if tx == 2
-            input[2] = convert(Float32,agent_y_coordinate / screen_height)
+            @inbounds input[2] = convert(Float32,agent_y_coordinate / screen_height)
             #end
             #sensor data
             #if tx == 3
-            input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
+            @inbounds input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
             #end
             #if tx == 4
-            input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
+            @inbounds input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
             #end
             #if tx == 5
-            input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
+            @inbounds input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
             #end
             #if tx == 6
-            input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
+            @inbounds input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
             #end
 
 
