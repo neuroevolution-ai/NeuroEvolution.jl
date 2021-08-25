@@ -26,7 +26,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
     alpha = 0.0f0
     fitness_total = 0
     if threadIdx().x == 1
-    Random.seed!(Random.default_rng(),env_seed[1])
+    #Random.seed!(Random.default_rng(),env_seed[1])
     end
     #####################################################
     #offset = 0
