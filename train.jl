@@ -445,7 +445,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
 
 
             fitness_current += rew
-            sync_threads()
+            #sync_threads()
             end
         end
 
