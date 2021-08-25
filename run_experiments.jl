@@ -322,10 +322,11 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             
             #############################################
             #end of Brain step()
+
             sync_threads()
             #env step()
             #############################################
-            if tx <= 2
+            if tx == 1
                 #@inbounds maze_objects_array[tx] += clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
                 #@cuprintln(index)
                 #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
@@ -421,32 +422,18 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #end
             #get state of environment as Input for Brain
             #############################################
-            #=
-            if tx == 1
+            
             @inbounds input[1] = convert(Float32,agent_x_coordinate / screen_width)
-            end
-            if tx == 2
             @inbounds input[2] = convert(Float32,agent_y_coordinate / screen_height)
-            end
             #sensor data
-            if tx == 1
             @inbounds input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
-            end
-            if tx == 2
             @inbounds input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
-            end
-            if tx == 1
             @inbounds input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
-            end
-            if tx == 2
             @inbounds input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
-            end
-            =#
 
             #fitness_current += rew
-            sync_threads()
             end
-            
+            sync_threads() 
         end
         
         ####################################################
@@ -503,7 +490,7 @@ function main()
 
         individuals = fill(0.0f0,number_individuals,free_parameters) # number_individuals, free_parameters
         genomes = convert(Array{Array{Float32}},ask(optimizer))
-        println(generation)
+        #println(generation)
         for i in 1:number_individuals
             for j in 1:free_parameters
                 individuals[i,j] = (genomes[i])[j]
