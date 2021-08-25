@@ -327,18 +327,18 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #env step()
             #############################################
             if tx == 1
-                #@inbounds maze_objects_array[tx] += clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                ##@inbounds maze_objects_array[tx] += clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
                 #@cuprintln(index)
-                #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-                #agent_y_coordinate += clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_x_coordinate += clamp(floor(@inbounds action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_y_coordinate += clamp(floor(@inbounds action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
                 #sync_threads()
                 # Check agent collisions with outer walls
-                #agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
-                #agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
-                #agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
-                #agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
+                agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
+                agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
+                agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
+                agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
                 #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
                 #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
                 # Get cell indizes of agents current position
