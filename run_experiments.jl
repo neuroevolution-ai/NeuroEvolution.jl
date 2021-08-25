@@ -282,14 +282,14 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             end
             sync_threads()
             #
-        if tx <= 6
-        @inbounds @cuprintln(input[tx])
-        end
-        #=
+        #if tx <= 6
+        #@inbounds @cuprintln(input[tx])
+        #end
+        
         #Loop through Timesteps
         #################################################
         for index in 1:number_timesteps
-
+            
             #Brain step()
             #############################################
             #brain_step(tx,temp_V, V, W, T, x, input, action,alpha,delta_t,clipping_range)
@@ -319,7 +319,10 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 end
                 @inbounds action[tx] = tanh(T_value)
             end
-            
+            if tx <= 2
+            @cuprintln(action[tx])
+            end
+            #=
             #############################################
             #end of Brain step()
             sync_threads()
@@ -447,21 +450,22 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             fitness_current += rew
             sync_threads()
             end
+            =#
         end
-
+        
         ####################################################
         #end of Timestep
-        if tx == 1
-        fitness_total += fitness_current
-        end
+        #if tx == 1
+        #fitness_total += fitness_current
+        #end
         sync_threads()
-        =#
+        
     end
     ######################################################
     #end of Round
-    if tx == 1
+    #if tx == 1
     #results[blockIdx().x] = fitness_total / number_rounds
-    end
+    #end
 
     
     return
