@@ -508,6 +508,7 @@ function main()
         individuals_gpu = CuArray(individuals)
         println("start Generation:",generation)
         @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu)
+        CUDA.synchronize()
         println("finished Generation:",generation)
         rewards = rand(Float32,112)
         rewards = rewards .* 100
