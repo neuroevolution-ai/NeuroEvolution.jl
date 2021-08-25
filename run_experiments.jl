@@ -95,7 +95,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
     #Loop through Rounds
     #####################################################
     for j in 1:number_rounds
-    #=
+    
         fitness_current = 0
 
         agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
@@ -235,7 +235,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         #####################################################
         #
         #Maze created
-
+        #=
         #Setup Rest
         ############
         #Place agent randomly in maze
