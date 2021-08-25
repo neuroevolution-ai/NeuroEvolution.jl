@@ -327,7 +327,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #############################################
             if tx <= 2
                 #@inbounds maze_objects_array[tx] += 1#clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-                @cuprintln("Coordinate:",tx," Value:",maze_objects_array[tx])
+                #@cuprintln("Coordinate:",tx," Value:",maze_objects_array[tx])
                 #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
                 #agent_y_coordinate += clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
