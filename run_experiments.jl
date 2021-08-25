@@ -322,9 +322,9 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #############################################
             if tx == 1
             
-                #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_x_coordinate = agent_x_coordinate + clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
-                #agent_y_coordinate +=  clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_y_coordinate = agent_y_coordinate + clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
                 #sync_threads()
