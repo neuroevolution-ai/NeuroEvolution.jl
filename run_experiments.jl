@@ -418,11 +418,10 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             end
 
             =#
-            sync_threads()
             #end
             #get state of environment as Input for Brain
             #############################################
-            
+            #=
             if tx == 1
             @inbounds input[1] = convert(Float32,agent_x_coordinate / screen_width)
             end
@@ -442,7 +441,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             if tx == 2
             @inbounds input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
             end
-
+            =#
 
             #fitness_current += rew
             sync_threads()
