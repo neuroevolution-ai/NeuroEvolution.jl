@@ -60,6 +60,15 @@ function main()
     println("best_genome_overall:",best_genome_overall)
     best_reward_overall = typemin(Int32)
     println("best_reward_overall:",best_reward_overall)
+
+    for generation in 1:number_generations
+        env_seed = Random.rand((number_validation_runs:maximum_env_seed), 1)
+
+        individuals = fill(0.0f0,number_individuals,free_parameters) # number_individuals, free_parameters
+        genomes = convert(Array{Array{Float32}},ask(optimizer))
+        display(genomes)
+    end
+
 end
 
 

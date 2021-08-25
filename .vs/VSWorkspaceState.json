@@ -8,6 +8,6 @@
     "\\tests",
     "\\tools"
   ],
-  "SelectedNode": "\\optimizers\\optimizer.jl",
+  "SelectedNode": "\\configurations\\CMA_ES_Deap_CTRNN_Dense.json",
   "PreviewInSolutionExplorer": false
 }
