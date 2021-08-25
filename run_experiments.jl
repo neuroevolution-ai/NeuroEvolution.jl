@@ -99,34 +99,22 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         fitness_current = 0
 
         agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("agent_x_coordinate:",agent_x_coordinate)
-        end
+
 
         agent_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("agent_y_coordinate:",agent_y_coordinate)
-        end
+
 
         positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("positive_point_x_coordinate:",positive_point_x_coordinate)
-        end
+
 
         positive_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("positive_point_y_coordinate:",positive_point_y_coordinate)
-        end
+
 
         negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("negative_point_x_coordinate:",negative_point_x_coordinate)
-        end
+
 
         negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-        if tx == 1
-        @cuprintln("negative_point_y_coordinate:",negative_point_y_coordinate)
-        end
+
         #setup Environment
         #################################################
         cell_x_coordinate = 1
@@ -253,7 +241,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         #####################################################
         #
         #Maze created
-        #=
+        
         #Setup Rest
         ############
         #Place agent randomly in maze
@@ -267,8 +255,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             @inbounds maze_objects_array[tx] = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows) + 1) * maze_cell_size)#
         end
         sync_threads()
-        #positive_point_coordinates = 
-        =#
+        
         
         ############
         #################################################
@@ -338,10 +325,9 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             sync_threads()
             #env step()
             #############################################
-            if tx == 1
-            
+            if tx <= 2
+                @inbounds maze_objects_array[tx] += clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
                 #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-         
                 #agent_y_coordinate += clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
