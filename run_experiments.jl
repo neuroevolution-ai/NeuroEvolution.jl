@@ -87,7 +87,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
     x_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array))
     y_coordinate_stack = @cuDynamicSharedMem(Int32,total_amount_of_cells,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack))
     neighbours = @cuDynamicSharedMem(Int32,4,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze)+sizeof(maze_objects_array)+sizeof(x_coordinate_stack)+sizeof(y_coordinate_stack))
-    #=
+    
     ####################################################
     
     #fitness_total = 0
@@ -232,13 +232,13 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         end
 
         #####################################################
-        #=
+        #
         #Maze created
 
         #Setup Rest
         ############
         #Place agent randomly in maze
-
+        #=
         # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate,cell_x,cell_y,x_left,x_right,y_top,y_bottom]
 
         if tx == 1 || tx == 3 || tx == 5 
@@ -281,6 +281,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         #if tx <= 6
         #@inbounds @cuprintln(input[tx])
         #end
+        #=
         #Loop through Timesteps
         #################################################
         for index in 1:number_timesteps
@@ -450,15 +451,15 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         fitness_total += fitness_current
         end
         sync_threads()
-
+        =#
     end
     ######################################################
     #end of Round
     if tx == 1
-    results[blockIdx().x] = fitness_total / number_rounds
+    #results[blockIdx().x] = fitness_total / number_rounds
     end
 
-    =#
+    
     return
 end
 
