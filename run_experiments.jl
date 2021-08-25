@@ -48,9 +48,15 @@ function main()
         individuals = fill(0.0f0,number_individuals,free_parameters) # number_individuals, free_parameters
         genomes = convert(Array{Array{Float32}},ask(optimizer))
         println(generation)
-
+        for i in 1:number_individuals
+            for j in 1:free_parameters
+                individuals[i,j] = (genomes[i])[j]
+            end
+        end
 
         rewards = rand(Float32,112)
+        rewards = rewards .* 100
+        #display(rewards)
         tell(optimizer,rewards)
     end
 
