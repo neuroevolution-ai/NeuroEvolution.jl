@@ -95,6 +95,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
     #Loop through Rounds
     #####################################################
     for j in 1:number_rounds
+    #=
         fitness_current = 0
 
         agent_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
@@ -253,6 +254,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
         ############
         #################################################
         #environment finished
+        #=
             if tx == 1
             input[tx] = convert(Float32,agent_x_coordinate / screen_width)
             #@cuprintln(input[tx])
@@ -278,6 +280,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
             end
             sync_threads()
+            =#
         #if tx <= 6
         #@inbounds @cuprintln(input[tx])
         #end
