@@ -326,8 +326,8 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #env step()
             #############################################
             if tx <= 2
-                #@inbounds maze_objects_array[tx] += 1#clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
-                #@cuprintln("Coordinate:",tx," Value:",maze_objects_array[tx])
+                @inbounds maze_objects_array[tx] += clamp(floor(action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+
                 #agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
                 #agent_y_coordinate += clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
@@ -418,31 +418,30 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             end
 
             =#
-
+            sync_threads()
             #end
-            #sync_threads()
             #get state of environment as Input for Brain
             #############################################
             
-            #if tx == 1
+            if tx == 1
             @inbounds input[1] = convert(Float32,agent_x_coordinate / screen_width)
-            #end
-            #if tx == 2
+            end
+            if tx == 2
             @inbounds input[2] = convert(Float32,agent_y_coordinate / screen_height)
-            #end
+            end
             #sensor data
-            #if tx == 3
+            if tx == 1
             @inbounds input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
-            #end
-            #if tx == 4
+            end
+            if tx == 2
             @inbounds input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
-            #end
-            #if tx == 5
+            end
+            if tx == 1
             @inbounds input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
-            #end
-            #if tx == 6
+            end
+            if tx == 2
             @inbounds input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
-            #end
+            end
 
 
             #fitness_current += rew
