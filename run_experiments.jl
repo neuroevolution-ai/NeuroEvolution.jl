@@ -343,18 +343,18 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
                 # Get cell indizes of agents current position
                 
-                #cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-                #cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+                cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+                cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
 
             
                 # Get coordinates of current cell
-                #x_left = maze_cell_size * (cell_x - 1)
-                #x_right = maze_cell_size * cell_x
-                #y_bottom = maze_cell_size * (cell_y - 1)
-                #y_top = maze_cell_size * cell_y
+                x_left = maze_cell_size * (cell_x - 1)
+                x_right = maze_cell_size * cell_x
+                y_bottom = maze_cell_size * (cell_y - 1)
+                y_top = maze_cell_size * cell_y
                 #@cuprintln(agent_y_coordinate)
                 # Check agent collisions with maze walls
-                #=
+                
                 if @inbounds maze[cell_y,cell_x,1] == 0 #check for Northern Wall
                     agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
                 end
@@ -418,7 +418,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                     rew = reward_per_collected_negative_point
             end
 
-            =#
+            
             #end
             #get state of environment as Input for Brain
             #############################################
