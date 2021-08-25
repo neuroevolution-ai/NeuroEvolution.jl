@@ -319,7 +319,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 end
                 @inbounds action[tx] = tanh(T_value)
             end
-            #=
+            
             #############################################
             #end of Brain step()
             sync_threads()
@@ -444,10 +444,10 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #end
 
 
-            fitness_current += rew
+            #fitness_current += rew
             sync_threads()
             end
-            =#
+            
         end
         
         ####################################################
