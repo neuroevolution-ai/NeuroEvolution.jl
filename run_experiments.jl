@@ -326,6 +326,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #env step()
             #############################################
             if tx == 1
+            #=
             agent_x_coordinate += clamp(floor(@inbounds action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
             agent_y_coordinate +=  clamp(floor(@inbounds action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
@@ -416,7 +417,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
                 rew = reward_per_collected_negative_point
             end
 
-            
+            =#
 
             #end
             #sync_threads()
