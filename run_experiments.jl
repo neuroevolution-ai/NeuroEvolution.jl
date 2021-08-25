@@ -334,10 +334,10 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
 
                 #sync_threads()
                 # Check agent collisions with outer walls
-                agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
-                agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
-                agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
-                agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
+                #agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
+                #agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
+                #agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
+                #agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
                 #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
                 #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
                 # Get cell indizes of agents current position
