@@ -327,94 +327,94 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #############################################
             if tx == 1
             
-            agent_x_coordinate += clamp(floor(@inbounds action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_x_coordinate += clamp(floor(@inbounds action[tx] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
-            agent_y_coordinate +=  clamp(floor(@inbounds action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+                agent_y_coordinate +=  clamp(floor(@inbounds action[tx*2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
-            #sync_threads()
-            # Check agent collisions with outer walls
-            agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
-            agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
-            agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
-            agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
-            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
-            # Get cell indizes of agents current position
-            #=
-            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+                #sync_threads()
+                # Check agent collisions with outer walls
+                #agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
+                #agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
+                #agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
+                #agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
+                #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
+                #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
+                # Get cell indizes of agents current position
+                #=
+                cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+                cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
 
             
-            # Get coordinates of current cell
-            x_left = maze_cell_size * (cell_x - 1)
-            x_right = maze_cell_size * cell_x
-            y_bottom = maze_cell_size * (cell_y - 1)
-            y_top = maze_cell_size * cell_y
-            #@cuprintln(agent_y_coordinate)
-            # Check agent collisions with maze walls
+                # Get coordinates of current cell
+                x_left = maze_cell_size * (cell_x - 1)
+                x_right = maze_cell_size * cell_x
+                y_bottom = maze_cell_size * (cell_y - 1)
+                y_top = maze_cell_size * cell_y
+                #@cuprintln(agent_y_coordinate)
+                # Check agent collisions with maze walls
 
-            if @inbounds maze[cell_y,cell_x,1] == 0 #check for Northern Wall
-                agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
-            end
-            #@cuprintln(agent_y_coordinate)
-            if @inbounds maze[cell_y,cell_x,3] == 0 #check for Southern Wall
-                agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
-            end
-            if @inbounds maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
-                agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
-            end
+                if @inbounds maze[cell_y,cell_x,1] == 0 #check for Northern Wall
+                    agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
+                end
+                #@cuprintln(agent_y_coordinate)
+                if @inbounds maze[cell_y,cell_x,3] == 0 #check for Southern Wall
+                    agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
+                end
+                if @inbounds maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
+                    agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
+                end
 
-            if @inbounds maze[cell_y,cell_x,4] == 0 #check for Western Wall
-                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
-            end
-            # Check agent collision with top-left edge (prevents sneaking through the edge)
-            if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
-                agent_x_coordinate = x_left + agent_radius
-                agent_y_coordinate = y_top + agent_radius
-            end
+                if @inbounds maze[cell_y,cell_x,4] == 0 #check for Western Wall
+                    agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
+                end
+                # Check agent collision with top-left edge (prevents sneaking through the edge)
+                if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
+                    agent_x_coordinate = x_left + agent_radius
+                    agent_y_coordinate = y_top + agent_radius
+                end
 
-            # Check agent collision with top-right edge (prevents sneaking through the edge)
-            if (x_right - agent_x_coordinate < agent_radius) && (agent_y_coordinate - y_top < agent_radius)
-                agent_x_coordinate = x_right - agent_radius
-                agent_y_coordinate = y_top + agent_radius
-            end
+                # Check agent collision with top-right edge (prevents sneaking through the edge)
+                if (x_right - agent_x_coordinate < agent_radius) && (agent_y_coordinate - y_top < agent_radius)
+                    agent_x_coordinate = x_right - agent_radius
+                    agent_y_coordinate = y_top + agent_radius
+                end
 
-            # Check agent collision with bottom-right edge (prevents sneaking through the edge)
-            if (x_right - agent_x_coordinate < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
-                agent_x_coordinate = x_right - agent_radius
+                # Check agent collision with bottom-right edge (prevents sneaking through the edge)
+                if (x_right - agent_x_coordinate < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
+                    agent_x_coordinate = x_right - agent_radius
                 agent_y_coordinate = y_bottom - agent_radius
-            end
+                end
 
-            # Check agent collision with bottom-left edge (prevents sneaking through the edge)
-            if (agent_x_coordinate - x_left < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
-                agent_x_coordinate = x_left + agent_radius
-                agent_y_coordinate = y_bottom + agent_radius
-            end
+                # Check agent collision with bottom-left edge (prevents sneaking through the edge)
+                if (agent_x_coordinate - x_left < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
+                    agent_x_coordinate = x_left + agent_radius
+                    agent_y_coordinate = y_bottom + agent_radius
+                end
             
-            #get sensor signals
-            #
-            #
-            #
-            #
+                #get sensor signals
+                #
+                #
+                #
+                #
 
-            rew = 0.0f0
+                rew = 0.0f0
 
-            # Collect positive point in reach
-            distance = sqrt((positive_point_x_coordinate - agent_x_coordinate) ^ 2 + (positive_point_y_coordinate - agent_y_coordinate) ^ 2)
-            if distance <= point_radius + agent_radius
-                #place new positive_point randomly in maze
-                positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-                positive_point_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-                rew = reward_per_collected_positive_point
-            end
-            # Collect negative point in reach
-            distance = sqrt((negative_point_x_coordinate - agent_x_coordinate) ^ 2 + (negative_point_y_coordinate - agent_y_coordinate) ^ 2)
-            if distance <= point_radius + agent_radius
-                #place new negative_point randomly in maze
-                negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-                negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-                rew = reward_per_collected_negative_point
+                # Collect positive point in reach
+                distance = sqrt((positive_point_x_coordinate - agent_x_coordinate) ^ 2 + (positive_point_y_coordinate - agent_y_coordinate) ^ 2)
+                if distance <= point_radius + agent_radius
+                    #place new positive_point randomly in maze
+                    positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+                    positive_point_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+                    rew = reward_per_collected_positive_point
+                end
+                # Collect negative point in reach
+                distance = sqrt((negative_point_x_coordinate - agent_x_coordinate) ^ 2 + (negative_point_y_coordinate - agent_y_coordinate) ^ 2)
+                if distance <= point_radius + agent_radius
+                    #place new negative_point randomly in maze
+                    negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+                    negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+                    rew = reward_per_collected_negative_point
             end
 
             =#
