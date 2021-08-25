@@ -326,7 +326,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #env step()
             #############################################
             if tx == 1
-            #=
+            
             agent_x_coordinate += clamp(floor(@inbounds action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
          
             agent_y_coordinate +=  clamp(floor(@inbounds action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
@@ -341,7 +341,7 @@ function kernel_eval_fitness(individuals)#,results, env_seed,number_rounds_given
             #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
             #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
             # Get cell indizes of agents current position
-
+            #=
             cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
             cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
 
