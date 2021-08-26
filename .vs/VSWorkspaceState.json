@@ -8,6 +8,6 @@
     "\\tests",
     "\\tools"
   ],
-  "SelectedNode": "\\configurations\\CMA_ES_Deap_CTRNN_Dense.json",
+  "SelectedNode": "\\environments\\collect_points_env.jl",
   "PreviewInSolutionExplorer": false
 }

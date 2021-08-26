@@ -21,12 +21,12 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
     delta_t = 0.05f0
     tx = threadIdx().x
     bx = blockIdx().x
-    v_size = 6*50 # input_size * number_neurons
-    w_size = 50*50 # number_neurons * number_neurons
-    number_rounds = number_rounds_given[1]
     number_neurons = 50
-    input_size = 6
+    input_size = 10
     output_size = 2
+    v_size = input_size * number_neurons
+    w_size = number_neurons * number_neurons
+    number_rounds = number_rounds_given[1]
     number_timesteps = 1000
     clipping_range = 1.0f0
     alpha = 0.0f0
@@ -108,11 +108,11 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
 
         positive_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
 
-        positive_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+        positive_point_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
 
-        negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
+        negative_point_x_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
 
-        negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+        negative_point_y_coordinate = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
         #setup Environment
         #################################################
         cell_x_coordinate = 1
@@ -256,32 +256,127 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
         #positive_point_coordinates = 
         =#
         ############
+            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
+            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+
+            
+            # Get coordinates of current cell
+            x_left = maze_cell_size * (cell_x - 1)
+            x_right = maze_cell_size * cell_x
+            y_bottom = maze_cell_size * (cell_y - 1)
+            y_top = maze_cell_size * cell_y
+        #get first sensor_data:
+        sensor_north =  begin
+                            sensor_distance = y_top - agent_y_coordinate - agent_radius
+                            direction = 1
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_y + 1) > maze_rows
+                                    break
+                                end
+                                current_cell_y += 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_east = begin
+                            sensor_distance = x_right - agent_x_coordinate - agent_radius
+                            direction = 2
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_x - 1) < 1
+                                    break
+                                end
+                                current_cell_x -= 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_south = begin
+                            sensor_distance = agent_y_coordinate - y_bottom - agent_radius
+                            direction = 3
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_y - 1) < 1
+                                    break
+                                end
+                                current_cell_y -= 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_west = begin
+                            sensor_distance = agent_x_coordinate - x_left - agent_radius
+                            direction = 4
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_x + 1) > maze_columns
+                                    break
+                                end
+                                current_cell_x += 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+
         #################################################
         #environment finished
             if tx == 1
-            input[tx] = convert(Float32,agent_x_coordinate / screen_width)
+                input[tx] = convert(Float32,agent_x_coordinate / screen_width)
             #@cuprintln(input[tx])
             end
             if tx == 2
-            input[tx] = convert(Float32,agent_y_coordinate / screen_height)
+                input[tx] = convert(Float32,agent_y_coordinate / screen_height)
             #@cuprintln(input[tx])
             end
             #sensor data
             if tx == 3
-            input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,sensor_north / screen_height)
             end
             if tx == 4
-            input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,sensor_east / screen_width)
             end
             if tx == 5
-            input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+                input[tx] = convert(Float32,sensor_south / screen_height)
             end
             if tx == 6
+                input[tx] = convert(Float32,sensor_west / screen_width)
+            end
+            if tx == 7
+                input[tx] = convert(Float32,positive_point_x_coordinate / screen_width)
+            end
+            if tx == 8
+                input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
+            #@cuprintln(input[tx])
+            end
+            if tx == 9
+                input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
+            #@cuprintln(input[tx])
+            end
+            if tx == 10
                 input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
             end
+
             sync_threads()
         #if tx <= 6
         #@inbounds @cuprintln(input[tx])
@@ -391,11 +486,88 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                 agent_y_coordinate = y_bottom + agent_radius
             end
             
-            #get sensor signals
-            #
-            #
-            #
-            #
+            #if number_of_sensors == 4
+
+            sensor_north =  begin
+                            sensor_distance = y_top - agent_y_coordinate - agent_radius
+                            direction = 1
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_y + 1) > maze_rows
+                                    break
+                                end
+                                current_cell_y += 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_east = begin
+                            sensor_distance = x_right - agent_x_coordinate - agent_radius
+                            direction = 2
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_x - 1) < 1
+                                    break
+                                end
+                                current_cell_x -= 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_south = begin
+                            sensor_distance = agent_y_coordinate - y_bottom - agent_radius
+                            direction = 3
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_y - 1) < 1
+                                    break
+                                end
+                                current_cell_y -= 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            sensor_west = begin
+                            sensor_distance = agent_x_coordinate - x_left - agent_radius
+                            direction = 4
+                            current_cell_x = cell_x
+                            current_cell_y = cell_y
+                            while true  
+                                if (current_cell_x + 1) > maze_columns
+                                    break
+                                end
+                                current_cell_x += 1
+                                if maze[current_cell_y,current_cell_x,direction] == 0
+                                    break
+                                else 
+                                    sensor_distance += maze_cell_size
+                                end
+                            end
+                            sensor_distance
+                            end
+            #get sensor distance:
+
+            #Step1: arguments: direction (Int range 1:4), cell_x, cell_y
+            #Step2 get edge values of cell
+            #step3: get which way to step through maze from direction
+            #step4: loop stepping through maze in direction until wall in cell in that direction is encountered, increase sensor_distance all the while
+            #end
+
 
             rew = 0.0f0
 
@@ -412,7 +584,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             if distance <= point_radius + agent_radius
                 #place new negative_point randomly in maze
                 negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-                negative_point_x_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
+                negative_point_y_coordinate =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
                 rew = reward_per_collected_negative_point
             end
 
@@ -429,24 +601,29 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             #if tx == 2
             input[2] = convert(Float32,agent_y_coordinate / screen_height)
             #end
+            input[3] = convert(Float32, sensor_north / screen_height)
+            input[4] = convert(Float32, sensor_east / screen_width)
+            input[5] = convert(Float32, sensor_south / screen_height)
+            input[6] = convert(Float32, sensor_west / screen_width)
             #sensor data
             #if tx == 3
-            input[3] = convert(Float32,positive_point_x_coordinate / screen_width)
+            input[7] = convert(Float32,positive_point_x_coordinate / screen_width)
             #end
             #if tx == 4
-            input[4] = convert(Float32,positive_point_y_coordinate / screen_height)
+            input[8] = convert(Float32,positive_point_y_coordinate / screen_height)
             #end
             #if tx == 5
-            input[5] = convert(Float32,negative_point_x_coordinate / screen_width)
+            input[9] = convert(Float32,negative_point_x_coordinate / screen_width)
             #end
             #if tx == 6
-            input[6] = convert(Float32,negative_point_y_coordinate / screen_height)
+            input[10] = convert(Float32,negative_point_y_coordinate / screen_height)
             #end
 
 
             fitness_current += rew
-            #sync_threads()
             end
+
+            sync_threads()
         end
 
         ####################################################
@@ -804,7 +981,7 @@ function main()
 
     maze_columns = 5
     maze_rows = 5
-    number_inputs = 6
+    number_inputs = 10
     number_outputs = 2
     number_neurons = brain["number_neurons"]
     number_individuals = optimizer["population_size"]
@@ -832,7 +1009,7 @@ function main()
             end
         end
 
-        input = CUDA.fill(1.0f0,6)
+        input = CUDA.fill(1.0f0,10)
         rewards_training = CUDA.fill(0f0,number_individuals)
         individuals_gpu = CuArray(individuals) 
         action = CUDA.fill(1.0f0,2)
