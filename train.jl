@@ -44,30 +44,12 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
 
   
     brain_initialize(tx,blockIdx().x,V,W,T,individuals)
-    #=
-    #Fill V,W,T with genome data
-    #####################################################
-    for i in 1:input_size #range(1:input_size)
-        @inbounds V[tx,i] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
-    end
-    for i in 1:number_neurons #range(1:number_neurons)
-        @inbounds W[tx,i] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
-        #@cuprintln("KoordinateW:",tx,";",i,":",W[tx,i])
-    end
-    for i in 1:output_size #range(1:output_size)
-        @inbounds T[i,tx] = individuals[blockIdx().x,v_size+w_size+(tx+((i-1)*number_neurons))] #tx * output_size
-        #@cuprintln("KoordinateT:",tx,";",i,":",T[tx,i])
-    end
-    #####################################################
-    =#
+
     sync_threads()
 
     #x = @cuStaticSharedMem(Float32,number_neurons)
     x = @cuDynamicSharedMem(Float32,number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input))
-    #x[tx]= 0.0f0
-    #temp_V = @cuStaticSharedMem(Float32,number_neurons)
-    #temp_W = @cuStaticSharedMem(Float32,number_neurons)
-    #action = @cuStaticSharedMem(Float32,output_size)
+
 
     temp_V = @cuDynamicSharedMem(Float32,number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(x))
     action = @cuDynamicSharedMem(Float32,output_size,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x))
@@ -131,7 +113,6 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             for i in 1:4
                 neighbours[i] = 0
             end
-            #@cuprintln("Iteration:",amount_of_cells_visited," cell_x_coordinate:", cell_x_coordinate," cell_y_coordinate:", cell_y_coordinate )
             #step1: find all neighboring cells which have not been visited yet
                 if  (cell_x_coordinate + 1) <= maze_columns
                     if maze[cell_y_coordinate,cell_x_coordinate+1,1] == 0 && maze[cell_y_coordinate,cell_x_coordinate+1,2] == 0 && maze[cell_y_coordinate,cell_x_coordinate+1,3] == 0 && maze[cell_y_coordinate,cell_x_coordinate+1,4] == 0
@@ -140,7 +121,6 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                         neighbours[1] = 0
                     end
                 end
-                #@cuprintln("Field:",1," Value:",neighbours[1])
                 if  (cell_x_coordinate - 1) >= 1
                     if maze[cell_y_coordinate,cell_x_coordinate-1,1] == 0 && maze[cell_y_coordinate,cell_x_coordinate-1,2] == 0 && maze[cell_y_coordinate,cell_x_coordinate-1,3] == 0 && maze[cell_y_coordinate,cell_x_coordinate-1,4] == 0
                         neighbours[2] = 1
@@ -148,7 +128,6 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                         neighbours[2] = 0
                     end
                 end
-                #@cuprintln("Field:",2," Value:",neighbours[2])
                 if  (cell_y_coordinate + 1) <= maze_rows
                     if maze[cell_y_coordinate+1,cell_x_coordinate,1] == 0 && maze[cell_y_coordinate+1,cell_x_coordinate,2] == 0 && maze[cell_y_coordinate+1,cell_x_coordinate,3] == 0 && maze[cell_y_coordinate+1,cell_x_coordinate,4] == 0
                         neighbours[3] = 1
@@ -195,40 +174,31 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                     end
                 end
             end
-            #@cuprintln("Iteration:",amount_of_cells_visited," move_x_coordinate:", move_x_coordinate)
-            #@cuprintln("Iteration:",amount_of_cells_visited," move_y_coordinate:", move_y_coordinate)
             #step4: knock down the wall between the cells for both cells
             
             if move_x_coordinate == 1 
                 maze[cell_y_coordinate,cell_x_coordinate,2] = 1
                 maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,4] = 1
-                #@cuprintln("W")
             end
             if move_x_coordinate == -1 
                 maze[cell_y_coordinate,cell_x_coordinate,4] = 1
                 maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,2] = 1
-                #@cuprintln("E")
             end
             if move_y_coordinate == 1 
                 maze[cell_y_coordinate,cell_x_coordinate,1] = 1
                 maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,3] = 1
-                #@cuprintln("N")
             end
             if move_y_coordinate == -1 
                 maze[cell_y_coordinate,cell_x_coordinate,3] = 1
                 maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,1] = 1
-                #@cuprintln("S")
             end
-            #@cuprintln("changed maze!")
             #step5: add origin cell to stack
             x_coordinate_stack[cell_stack_index] = cell_x_coordinate
             y_coordinate_stack[cell_stack_index] = cell_y_coordinate
-            #@cuprintln("Top_of_stack_index:",cell_stack_index," x coordinate:",x_coordinate_stack[cell_stack_index]," y coordinate:",y_coordinate_stack[cell_stack_index])
             cell_stack_index = cell_stack_index +1
             #step6: set coordinates to new cell
             cell_x_coordinate = cell_x_coordinate + move_x_coordinate
             cell_y_coordinate = cell_y_coordinate + move_y_coordinate
-            #@cuprintln("Iteration done!")
             amount_of_cells_visited = amount_of_cells_visited +1
 
         end
@@ -342,13 +312,10 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
         #environment finished
             if tx == 1
                 input[tx] = convert(Float32,agent_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
             end
             if tx == 2
                 input[tx] = convert(Float32,agent_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
             end
-            #sensor data
             if tx == 3
                 input[tx] = convert(Float32,sensor_north / screen_height)
             end
@@ -366,56 +333,26 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             end
             if tx == 8
                 input[tx] = convert(Float32,positive_point_y_coordinate / screen_height)
-            #@cuprintln(input[tx])
+
             end
             if tx == 9
                 input[tx] = convert(Float32,negative_point_x_coordinate / screen_width)
-            #@cuprintln(input[tx])
+
             end
             if tx == 10
                 input[tx] = convert(Float32,negative_point_y_coordinate / screen_height)
             end
 
             sync_threads()
-        #if tx <= 6
-        #@inbounds @cuprintln(input[tx])
-        #end
+
+
         #Loop through Timesteps
         #################################################
         for index in 1:number_timesteps
 
-            #Brain step()
-            #############################################
+
             brain_step(tx,temp_V, V, W, T, x, input, action,alpha,delta_t,clipping_range)
 
-            #=
-            #V*input matmul:
-
-            V_value = 0.0f0
-            for i = 1:input_size 
-                @inbounds V_value += V[tx, i] * input[i] #+ V_value
-            end
-            @inbounds temp_V[tx] = tanh(x[tx] + V_value) #find faster option for this step
-            sync_threads()
-            #W*temp_V matmul:
-            W_value = 0.0f0
-            for i = 1:number_neurons 
-                @inbounds W_value = W[tx, i] * temp_V[i] + W_value
-            end
-            @inbounds x[tx] += (delta_t * ((-alpha * x[tx]) + W_value))
-            @inbounds x[tx] = clamp(x[tx],-clipping_range,clipping_range)
-            sync_threads()
-            #T*temp_W matmul:
-            if tx <= output_size
-                T_value = 0.0f0
-                for i in 1:number_neurons
-                   @inbounds T_value +=T[tx,i] * x[i]
-                end
-                @inbounds action[tx] = tanh(T_value)
-            end
-            =#
-            #############################################
-            #end of Brain step()
             sync_threads()
             #env step()
             #############################################
@@ -425,16 +362,13 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             agent_y_coordinate +=  clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
             
 
-            #sync_threads()
             # Check agent collisions with outer walls
             agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
             agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
             agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
             agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
-            #@cuprintln("agent_x_coordinate:",agent_x_coordinate)
-            #@cuprintln("agent_y_coordinate:",agent_y_coordinate)
-            # Get cell indizes of agents current position
 
+            # Get cell indizes of agents current position
             cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
             cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
 
@@ -444,13 +378,11 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
             x_right = maze_cell_size * cell_x
             y_bottom = maze_cell_size * (cell_y - 1)
             y_top = maze_cell_size * cell_y
-            #@cuprintln(agent_y_coordinate)
             # Check agent collisions with maze walls
 
             if maze[cell_y,cell_x,1] == 0 #check for Northern Wall
                 agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
             end
-            #@cuprintln(agent_y_coordinate)
             if maze[cell_y,cell_x,3] == 0 #check for Southern Wall
                 agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
             end
@@ -485,7 +417,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                 agent_y_coordinate = y_bottom + agent_radius
             end
             
-            #if number_of_sensors == 4
+
 
             sensor_north =  begin
                             sensor_distance = y_top - agent_y_coordinate - agent_radius
@@ -559,13 +491,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
                             end
                             sensor_distance
                             end
-            #get sensor distance:
 
-            #Step1: arguments: direction (Int range 1:4), cell_x, cell_y
-            #Step2 get edge values of cell
-            #step3: get which way to step through maze from direction
-            #step4: loop stepping through maze in direction until wall in cell in that direction is encountered, increase sensor_distance all the while
-            #end
 
 
             rew = 0.0f0
@@ -589,34 +515,27 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
 
             
 
-            #end
-            #sync_threads()
+
             #get state of environment as Input for Brain
             #############################################
             
-            #if tx == 1
             input[1] = convert(Float32,agent_x_coordinate / screen_width)
-            #end
-            #if tx == 2
+
             input[2] = convert(Float32,agent_y_coordinate / screen_height)
-            #end
+
             input[3] = convert(Float32, sensor_north / screen_height)
             input[4] = convert(Float32, sensor_east / screen_width)
             input[5] = convert(Float32, sensor_south / screen_height)
             input[6] = convert(Float32, sensor_west / screen_width)
-            #sensor data
-            #if tx == 3
+
             input[7] = convert(Float32,positive_point_x_coordinate / screen_width)
-            #end
-            #if tx == 4
+
             input[8] = convert(Float32,positive_point_y_coordinate / screen_height)
-            #end
-            #if tx == 5
+
             input[9] = convert(Float32,negative_point_x_coordinate / screen_width)
-            #end
-            #if tx == 6
+
             input[10] = convert(Float32,negative_point_y_coordinate / screen_height)
-            #end
+
 
 
             fitness_current += rew
@@ -795,23 +714,6 @@ function kernel_env_step(action,input, maze)
     return
 end
 
-function has_all_walls(maze1,x,y)
-    for i in 1:4
-        if maze1[y,x,i] == 1
-            return false
-        end
-    end
-    return true
-end
-function has_no_neighbours(neighbours)
-    for i in 1:4
-        if neighbours[i] == 0
-            return false
-        end
-        return true
-    end
- end
-
 
 
 function main()
@@ -835,19 +737,16 @@ function main()
     free_parameters = get_individual_size(number_inputs,number_outputs,brain,brain_state)
 
     optimizer = inititalize_optimizer(free_parameters,optimizer)
-    #display(optimizer)
 
-    #@device_code_warntype @cuda threads=10 kernel_random(10)
-    #return
     #get start time of training and Date
-    #@cuda threads=5 blocks=5 kernel_random(1000)
+
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
 
     for generation in 1:number_generations
         env_seed = Random.rand((number_validation_runs:maximum_env_seed), 1)
 
-        individuals = fill(0.0f0,number_individuals,free_parameters) # number_individuals, free_parameters
+        individuals = fill(0.0f0,number_individuals,free_parameters)
         genomes = convert(Array{Array{Float32}},ask(optimizer))
         for i in 1:number_individuals
             for j in 1:free_parameters
@@ -859,13 +758,10 @@ function main()
         rewards_training = CUDA.fill(0f0,number_individuals)
         individuals_gpu = CuArray(individuals) 
         action = CUDA.fill(1.0f0,2)
-        #maze_cpu = fill(convert(Int32,0),(5,5,4))
-        #maze = CuArray(maze_cpu)
         fitness_results = CUDA.fill(0f0,112)
         rounds = CUDA.fill(number_rounds,1)
         println("start Generation:",generation)
         @cuda threads=number_neurons blocks=number_individuals shmem=sizeof(Float32)*(number_neurons*(number_neurons+number_inputs+number_outputs+2) + number_inputs + number_outputs) + sizeof(Int32) * (maze_columns * maze_rows * 6 + 16) kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed),rounds)
-        #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
         CUDA.synchronize()
         println("finished Generation:",generation)
         rewards_training = Array(fitness_results)
@@ -903,8 +799,4 @@ function main()
 
 end
 
-
-#display(individual)
-#@cuda threads=50 blocks=1 kernel_eval_fitness(individual,V,W,T,input)#,individuals,1,5)
-#CUDA.synchronize()
 main()
