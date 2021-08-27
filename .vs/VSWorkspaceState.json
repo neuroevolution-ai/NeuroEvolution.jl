@@ -8,6 +8,6 @@
     "\\tests",
     "\\tools"
   ],
-  "SelectedNode": "\\environments\\collect_points_env.jl",
+  "SelectedNode": "\\brains\\continuous_time_rnn.jl",
   "PreviewInSolutionExplorer": false
 }

@@ -49,7 +49,6 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
     #####################################################
     for i in 1:input_size #range(1:input_size)
         @inbounds V[tx,i] = individuals[blockIdx().x,i+((tx-1)*input_size)]  #tx * input_size
-        #@cuprintln("KoordinateV:",tx,";",i,";",blockIdx().x,":",V[tx,i,blockIdx().x]," Genom:",individuals[blockIdx().x,i+((tx-1)*input_size)])
     end
     for i in 1:number_neurons #range(1:number_neurons)
         @inbounds W[tx,i] = individuals[blockIdx().x,v_size+(i+((tx-1)*number_neurons))] #tx * number_neurons
@@ -958,15 +957,6 @@ function kernel_create_maze(maze)
     return
 end
 
-function kernel_random(env_seed)
-    if threadIdx().x == 1
-    Random.seed!(Random.default_rng(),env_seed+blockIdx().x)
-    end
-    #sync_threads()
-    test = rand(Int32)
-    @cuprintln("Block:",blockIdx().x," Thread:", threadIdx().x ," Result:",test)
-    return
-end
 
 function main()
     configuration = JSON.parsefile("configurations/CMA_ES_Deap_CTRNN_Dense.json")
@@ -1022,13 +1012,11 @@ function main()
         #@cuda threads=number_neurons blocks=1 shmem=sizeof(Int32) * (maze_columns * maze_rows * 2 + 16) kernel_create_maze(maze)
         CUDA.synchronize()
         println("finished Generation:",generation)
-        # @cuda threads=50 blocks=1 kernel_env_step(action,input, maze)
         rewards_training = Array(fitness_results)
 
         tell(optimizer,rewards_training)
 
         best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
-        #display(best_genome_current_generation)
 
 
         env_seeds = Array(1:number_validation_runs)

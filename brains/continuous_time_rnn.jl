@@ -1,6 +1,5 @@
 import Test
 function brain_initialize(threadID,blockID, V, W, T, individuals)
-
     number_neurons = size(W,1)
     input_size = size(V,2)
     output_size = size(T,1)
@@ -15,10 +14,13 @@ function brain_initialize(threadID,blockID, V, W, T, individuals)
     for i in 1:number_neurons
         @inbounds W[threadID,i] = individuals[blockID,v_size+(i+((threadID-1)*number_neurons))]
     end
+    @inbounds W[threadID,threadID] = -abs(W[threadID,threadID])
     for i in 1:output_size
         @inbounds T[i,threadID] = individuals[blockID,v_size+w_size+(threadID+((i-1)*number_neurons))]
     end
     #####################################################
+
+
 end
 
 function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,clipping_range)
@@ -59,17 +61,10 @@ end
 
 #Unit tests
 ##################################################################
-#=
+
 using Test
 #brain_initialize():
 @testset "Initialize Tests" begin
-    number_individuals = 112
-    input_size = 5
-    number_neurons = 25
-    output_size = 2
-    blockID = 1
-    threadID = 1
-    individuals = rand(Float32,(number_individuals,number_neurons^2+input_size*number_neurons+output_size*number_neurons))
 
 #Initialize V
 
@@ -77,7 +72,7 @@ using Test
 
 #Initialize T
 end
-=#
+
 
 #=
 @testset "Step Tests" begin
