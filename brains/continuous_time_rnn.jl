@@ -1,12 +1,21 @@
-import Test
-function brain_initialize(threadID,blockID, V, W, T, individuals)
+using CUDA
+
+function init_mem(number_neurons,input_size,output_size,offset)
+    v_size = input_size * number_neurons
+    w_size = number_neurons * number_neurons
+    V = @cuDynamicSharedMem(Float32,(number_neurons,input_size),offset)
+    W = @cuDynamicSharedMem(Float32,(number_neurons,number_neurons),offset + sizeof(V))
+    T = @cuDynamicSharedMem(Float32,(output_size,number_neurons),offset + sizeof(V)+sizeof(W))
+    offset += sizeof(V)+sizeof(W)+sizeof(T)
+    return V,W,T,offset
+end
+function brain_initialize(threadID,blockID, V,W,T, individuals)
     number_neurons = size(W,1)
     input_size = size(V,2)
     output_size = size(T,1)
     v_size = input_size * number_neurons
     w_size = number_neurons * number_neurons
-    #Fill V,W,T with genome data
-    #####################################################
+
     for i in 1:input_size
         @inbounds V[threadID,i] = individuals[blockID,i+((threadID-1)*input_size)]  
     end
@@ -18,9 +27,8 @@ function brain_initialize(threadID,blockID, V, W, T, individuals)
     for i in 1:output_size
         @inbounds T[i,threadID] = individuals[blockID,v_size+w_size+(threadID+((i-1)*number_neurons))]
     end
-    #####################################################
 
-
+    return
 end
 
 function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,clipping_range)
@@ -58,40 +66,63 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,c
             return
 end
 
+function get_masks_from_brain_state(brain_state::Dict) # what format for brain_state
+    v_mask = get(brain_state,"v_mask",1)
+    w_mask = get(brain_state,"w_mask",1)
+    t_mask = get(brain_state,"t_mask",1)
 
-#Unit tests
-##################################################################
-
-using Test
-#brain_initialize():
-@testset "Initialize Tests" begin
-
-#Initialize V
-
-#Initialize W
-
-#Initialize T
+    return v_mask, w_mask, t_mask
 end
 
-
-#=
-@testset "Step Tests" begin
-V =
-W = 
-T = 
-alpha =
-x1 =
-x2 =
-delta_t = 
-input =
-
-#Comparison
-dx_dt = -alpha * x + W*(tanh(x + (C*input)))
-x1 += delta_t * dx_dt
-x1 = clamp(x,-clipping_range,clipping_range)
-output = tanh(T*x)
-
-#
-brain_step
+function _generate_mask(n :: Int, m :: Int)
+    return trues(n,m)
 end
-=#
+
+function generate_brain_state(input_size,output_size,configuration::Dict)
+    #config = ContinuousTimeRNNCfg(value for (key,value) in configuration)
+
+    v_mask = _generate_mask(configuration["number_neurons"], input_size)
+    w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
+    t_mask = _generate_mask(output_size, configuration["number_neurons"])
+
+    return get_brain_state_from_masks(v_mask,w_mask,t_mask)
+end
+
+function get_brain_state_from_masks(v_mask,w_mask,t_mask)
+    return Dict("v_mask"=> v_mask,"w_mask"=>w_mask,"t_mask"=>t_mask)
+end
+
+function get_free_parameter_usage(input_size,output_size,configuration,brain_state)
+    v_mask, w_mask, t_mask = get_masks_from_brain_state(brain_state)
+
+        #count true values
+    free_parameters_v = count(v_mask)
+    free_parameters_w = count(w_mask)
+    free_parameters_t = count(t_mask)
+
+    free_parameters = Dict("V"=>free_parameters_v,"W"=> free_parameters_w,"T"=>free_parameters_t)
+    #=
+    if(configuration["optimize_x0"])
+        free_parameters["x_0"] = configuration["number_neurons"]
+    end
+    =#
+    return free_parameters
+end
+
+function sum_dict(node)
+    sum_ = 0
+    for (key,value) in node
+        if(value isa Dict)
+            sum_ += sum_dict(value)
+        else
+            sum_ += value
+        end
+        
+    end
+    return sum_
+end
+
+function get_individual_size(input_size,output_size,configuration,brain_state)
+    usage_dict = get_free_parameter_usage(input_size,output_size,configuration, brain_state)
+    return sum_dict(usage_dict)
+end
