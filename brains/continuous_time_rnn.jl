@@ -1,14 +1,5 @@
 using CUDA
 
-function init_mem(number_neurons,input_size,output_size,offset)
-    v_size = input_size * number_neurons
-    w_size = number_neurons * number_neurons
-    V = @cuDynamicSharedMem(Float32,(number_neurons,input_size),offset)
-    W = @cuDynamicSharedMem(Float32,(number_neurons,number_neurons),offset + sizeof(V))
-    T = @cuDynamicSharedMem(Float32,(output_size,number_neurons),offset + sizeof(V)+sizeof(W))
-    offset += sizeof(V)+sizeof(W)+sizeof(T)
-    return V,W,T,offset
-end
 function brain_initialize(threadID,blockID, V,W,T, individuals)
     number_neurons = size(W,1)
     input_size = size(V,2)
@@ -79,7 +70,6 @@ function _generate_mask(n :: Int, m :: Int)
 end
 
 function generate_brain_state(input_size,output_size,configuration::Dict)
-    #config = ContinuousTimeRNNCfg(value for (key,value) in configuration)
 
     v_mask = _generate_mask(configuration["number_neurons"], input_size)
     w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
@@ -101,11 +91,6 @@ function get_free_parameter_usage(input_size,output_size,configuration,brain_sta
     free_parameters_t = count(t_mask)
 
     free_parameters = Dict("V"=>free_parameters_v,"W"=> free_parameters_w,"T"=>free_parameters_t)
-    #=
-    if(configuration["optimize_x0"])
-        free_parameters["x_0"] = configuration["number_neurons"]
-    end
-    =#
     return free_parameters
 end
 

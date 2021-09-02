@@ -9,12 +9,9 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds_given)#
     #####################################################
     delta_t = 0.05f0
     tx = threadIdx().x
-    bx = blockIdx().x
     number_neurons = 50
     input_size = 10
     output_size = 2
-    v_size = input_size * number_neurons
-    w_size = number_neurons * number_neurons
     number_rounds = number_rounds_given[1]
     number_timesteps = 1000
     clipping_range = 1.0f0
