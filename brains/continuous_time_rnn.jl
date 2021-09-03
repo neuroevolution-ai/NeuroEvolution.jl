@@ -1,4 +1,21 @@
 using CUDA
+using Adapt
+
+struct CTRNN_Cfg
+    delta_t::Float32
+    number_neurons::Int64
+    clipping_range_min::Float32
+    clipping_range_max::Float32
+    alpha::Float32
+end
+function Adapt.adapt_structure(to,ctrnn::CTRNN_Cfg)
+    delta_t = Adapt.adapt_structure(to, ctrnn.delta_t)
+    number_neurons = Adapt.adapt_structure(to, ctrnn.number_neurons)
+    clipping_range_min = Adapt.adapt_structure(to, ctrnn.clipping_range_min)
+    clipping_range_max = Adapt.adapt_structure(to, ctrnn.clipping_range_max)
+    alpha = Adapt.adapt_structure(to, ctrnn.alpha)
+    CTRNN_Cfg(delta_t,number_neurons,clipping_range_min,clipping_range_max,alpha)
+end
 
 function brain_initialize(threadID,blockID, V,W,T, individuals)
     number_neurons = size(W,1)
@@ -22,10 +39,9 @@ function brain_initialize(threadID,blockID, V,W,T, individuals)
     return
 end
 
-function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,clipping_range)
+function brain_step(threadID, temp_V, V, W, T, x, input, action,brain_cfg::CTRNN_Cfg)#alpha, delta_t,clipping_range_min,clipping_range_max)
     input_size = size(V,2)
     output_size = size(T,1)
-    number_neurons = size(W,1)
 
             #V*input matmul:
             V_value = 0.0f0
@@ -37,18 +53,18 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action,alpha, delta_t,c
             @inbounds temp_V[threadID] = tanh(x[threadID] + V_value) 
             #W*temp_V matmul:
             W_value = 0.0f0
-            for i = 1:number_neurons 
+            for i = 1:brain_cfg.number_neurons 
                 @inbounds W_value = W[threadID, i] * temp_V[i] + W_value
             end
-            @inbounds x[threadID] += (delta_t * ((-alpha * x[threadID]) + W_value))
-            @inbounds x[threadID] = clamp(x[threadID],-clipping_range,clipping_range)
+            @inbounds x[threadID] += (brain_cfg.delta_t * ((-brain_cfg.alpha * x[threadID]) + W_value))
+            @inbounds x[threadID] = clamp(x[threadID],brain_cfg.clipping_range_min,brain_cfg.clipping_range_max)
             sync_threads()
 
             #T*temp_W matmul:
             
             if threadID <= output_size
                 T_value = 0.0f0
-                for i in 1:number_neurons
+                for i in 1:brain_cfg.number_neurons
                    @inbounds T_value = T_value + T[threadID,i] * x[i]
                 end
                 @inbounds action[threadID] = tanh(T_value)

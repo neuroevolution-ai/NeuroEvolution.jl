@@ -1,6 +1,8 @@
 using Test
 using CUDA
-include("D:/NeuroEvolution.jl/NeuroEvolution.jl/brains/continuous_time_rnn.jl")
+dir = @__DIR__
+display(dir)
+include("NeuroEvolution.jl/brains/continuous_time_rnn.jl")
 
 function test_kernel()
 	brain_step(threadIdx().x,)

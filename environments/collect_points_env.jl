@@ -1,79 +1,30 @@
-function get_sensor_distance(agent_x_coordinate,agent_y_coordinate,cell_x,cell_y,x_left,x_right,y_bottom,y_top,agent)
-    sensor_north =  begin
-                            sensor_distance = y_top - agent_y_coordinate - agent_radius
-                            direction = 1
-                            current_cell_x = cell_x
-                            current_cell_y = cell_y
-                            while true  
-                                if (current_cell_y + 1) > maze_rows
-                                    break
-                                end
-                                current_cell_y += 1
-                                if maze[current_cell_y,current_cell_x,direction] == 0
-                                    break
-                                else 
-                                    sensor_distance += maze_cell_size
-                                end
-                            end
-                            sensor_distance
-                            end
-    sensor_east = begin
-                            sensor_distance = x_right - agent_x_coordinate - agent_radius
-                            direction = 2
-                            current_cell_x = cell_x
-                            current_cell_y = cell_y
-                            while true  
-                                if (current_cell_x - 1) < 1
-                                    break
-                                end
-                                current_cell_x -= 1
-                                if maze[current_cell_y,current_cell_x,direction] == 0
-                                    break
-                                else 
-                                    sensor_distance += maze_cell_size
-                                end
-                            end
-                            sensor_distance
-                            end
-            sensor_south = begin
-                            sensor_distance = agent_y_coordinate - y_bottom - agent_radius
-                            direction = 3
-                            current_cell_x = cell_x
-                            current_cell_y = cell_y
-                            while true  
-                                if (current_cell_y - 1) < 1
-                                    break
-                                end
-                                current_cell_y -= 1
-                                if maze[current_cell_y,current_cell_x,direction] == 0
-                                    break
-                                else 
-                                    sensor_distance += maze_cell_size
-                                end
-                            end
-                            sensor_distance
-                            end
-            sensor_west = begin
-                            sensor_distance = agent_x_coordinate - x_left - agent_radius
-                            direction = 4
-                            current_cell_x = cell_x
-                            current_cell_y = cell_y
-                            while true  
-                                if (current_cell_x + 1) > maze_columns
-                                    break
-                                end
-                                current_cell_x += 1
-                                if maze[current_cell_y,current_cell_x,direction] == 0
-                                    break
-                                else 
-                                    sensor_distance += maze_cell_size
-                                end
-                            end
-                            sensor_distance
-                            end
+using Adapt
 
-    return sensor_north,sensor_east,sensor_south,sensor_west
+struct Collect_Points_Env_Cfg
+    maze_columns::Int64
+    maze_rows::Int64
+    maze_cell_size::Int32
+    agent_radius::Int32
+    point_radius::Int32
+    agent_movement_range::Float32
+    reward_per_collected_positive_point::Float32
+    reward_per_collected_negative_point::Float32
+    number_time_steps::Int32
 end
+function Adapt.adapt_structure(to,env::Collect_Points_Env_Cfg)
+    maze_columns = Adapt.adapt_structure(to, env.maze_columns)
+    maze_rows = Adapt.adapt_structure(to, env.maze_rows)
+    maze_cell_size = Adapt.adapt_structure(to, env.maze_cell_size)
+    agent_radius = Adapt.adapt_structure(to, env.agent_radius)
+    point_radius = Adapt.adapt_structure(to, env.point_radius)
+    agent_movement_range = Adapt.adapt_structure(to, env.agent_movement_range)
+    reward_per_collected_positive_point = Adapt.adapt_structure(to, env.reward_per_collected_positive_point)
+    reward_per_collected_negative_point = Adapt.adapt_structure(to, env.reward_per_collected_negative_point)
+    number_time_steps = Adapt.adapt_structure(to, env.number_time_steps)
+
+    Collect_Points_Env_Cfg(maze_columns,maze_rows,maze_cell_size,agent_radius,point_radius,agent_movement_range,reward_per_collected_positive_point,reward_per_collected_negative_point,number_time_steps)
+end
+
 
 
 function env_step(maze,action,input,environment_config_array,agent_movement_radius,maze_cell_size,agent_radius,point_radius,screen_width,screen_height,reward_per_collected_positive_point,reward_per_collected_negative_point,maze_columns,maze_rows)
@@ -245,18 +196,17 @@ function env_step(maze,action,input,environment_config_array,agent_movement_radi
 
             input[2] = convert(Float32,agent_y_coordinate / screen_height)
 
-            input[3] = convert(Float32, sensor_north / screen_height)
-            input[4] = convert(Float32, sensor_east / screen_width)
-            input[5] = convert(Float32, sensor_south / screen_height)
-            input[6] = convert(Float32, sensor_west / screen_width)
+            input[3] = convert(Float32,environment_config_array[3] / screen_width)
 
-            input[7] = convert(Float32,environment_config_array[3] / screen_width)
+            input[4] = convert(Float32,environment_config_array[4] / screen_height)
 
-            input[8] = convert(Float32,environment_config_array[4] / screen_height)
+            input[5] = convert(Float32,environment_config_array[5] / screen_width)
 
-            input[9] = convert(Float32,environment_config_array[5] / screen_width)
-
-            input[10] = convert(Float32,environment_config_array[6] / screen_height)
+            input[6] = convert(Float32,environment_config_array[6] / screen_height)
+            input[7] = convert(Float32, sensor_north / screen_height)
+            input[8] = convert(Float32, sensor_east / screen_width)
+            input[9] = convert(Float32, sensor_south / screen_height)
+            input[10] = convert(Float32, sensor_west / screen_width)
 
 
 
