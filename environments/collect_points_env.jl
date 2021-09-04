@@ -4,7 +4,7 @@ struct Collect_Points_Env_Cfg
     maze_columns::Int64
     maze_rows::Int64
     maze_cell_size::Int32
-    agent_radius::Int32
+    agent_radius::Int64
     point_radius::Int32
     agent_movement_range::Float32
     reward_per_collected_positive_point::Float32
@@ -25,95 +25,190 @@ function Adapt.adapt_structure(to,env::Collect_Points_Env_Cfg)
     Collect_Points_Env_Cfg(maze_columns,maze_rows,maze_cell_size,agent_radius,point_radius,agent_movement_range,reward_per_collected_positive_point,reward_per_collected_negative_point,number_time_steps)
 end
 
+function get_observation(maze,input,environment_config_array,env_cfg)
+    cell_x = convert(Int32,ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))
+    cell_y = convert(Int32,ceil(@inbounds environment_config_array[2] / env_cfg.maze_cell_size))
+    screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
+    screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
+            
+    x_left = env_cfg.maze_cell_size * (cell_x - 1)
+    x_right = env_cfg.maze_cell_size * cell_x
+    y_bottom = env_cfg.maze_cell_size * (cell_y - 1)
+    y_top = env_cfg.maze_cell_size * cell_y
 
+    sensor_north =  begin
+        sensor_distance = y_top - @inbounds environment_config_array[2] - env_cfg.agent_radius
+        direction = 1
+        current_cell_x = cell_x
+        current_cell_y = cell_y
+        while true  
+            if (current_cell_y + 1) > env_cfg.maze_rows
+                break
+            end
+            current_cell_y += 1
+            if maze[current_cell_y,current_cell_x,direction] == 0
+                 break
+            else 
+                sensor_distance += env_cfg.maze_cell_size
+            end
+        end
+        sensor_distance
+    end
+    sensor_east = begin
+        sensor_distance = x_right - @inbounds environment_config_array[1] - env_cfg.agent_radius
+        direction = 2
+        current_cell_x = cell_x
+        current_cell_y = cell_y
+        while true  
+            if (current_cell_x - 1) < 1
+                break
+            end
+            current_cell_x -= 1
+            if maze[current_cell_y,current_cell_x,direction] == 0
+                break
+            else 
+                sensor_distance += env_cfg.maze_cell_size
+            end
+        end
+        sensor_distance
+    end
+    sensor_south = begin
+        sensor_distance = @inbounds environment_config_array[2] - y_bottom - env_cfg.agent_radius
+        direction = 3
+        current_cell_x = cell_x
+        current_cell_y = cell_y
+        while true  
+            if (current_cell_y - 1) < 1
+                break
+            end
+            current_cell_y -= 1
+            if maze[current_cell_y,current_cell_x,direction] == 0
+                break
+            else 
+                sensor_distance += env_cfg.maze_cell_size
+            end
+        end
+        sensor_distance
+    end
+    sensor_west = begin
+        sensor_distance = @inbounds environment_config_array[1] - x_left - env_cfg.agent_radius
+        direction = 4
+        current_cell_x = cell_x
+        current_cell_y = cell_y
+        while true  
+            if (current_cell_x + 1) > env_cfg.maze_columns
+                break
+            end
+            current_cell_x += 1
+            if maze[current_cell_y,current_cell_x,direction] == 0
+                break
+            else 
+                sensor_distance += env_cfg.maze_cell_size
+            end
+        end
+        sensor_distance
+    end
 
-function env_step(maze,action,input,environment_config_array,agent_movement_radius,maze_cell_size,agent_radius,point_radius,screen_width,screen_height,reward_per_collected_positive_point,reward_per_collected_negative_point,maze_columns,maze_rows)
+    @inbounds input[1] = convert(Float32,@inbounds environment_config_array[1] / screen_width)
+    @inbounds input[2] = convert(Float32,@inbounds environment_config_array[2] / screen_height)
+    @inbounds input[3] = convert(Float32,@inbounds environment_config_array[3] / screen_width)
+    @inbounds input[4] = convert(Float32,@inbounds environment_config_array[4] / screen_height)
+    @inbounds input[5] = convert(Float32,@inbounds environment_config_array[5] / screen_width)
+    @inbounds input[6] = convert(Float32,@inbounds environment_config_array[6] / screen_height)
+    @inbounds input[7] = convert(Float32,sensor_north / screen_height)
+    @inbounds input[8] = convert(Float32,sensor_east / screen_width)
+    @inbounds input[9] = convert(Float32,sensor_south / screen_height)
+    @inbounds input[10] = convert(Float32,sensor_west / screen_height)
+end
 
+function env_step(maze,action,input,environment_config_array,env_cfg::Collect_Points_Env_Cfg)
 
+            screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
+            screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
 
-            agent_x_coordinate = environment_config_array[1] + clamp(floor(action[1] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+            agent_x_coordinate = environment_config_array[1] + clamp(floor(action[1] * env_cfg.agent_movement_range),-env_cfg.agent_movement_range,env_cfg.agent_movement_range)
          
-            agent_y_coordinate = environment_config_array[2] + clamp(floor(action[2] * agent_movement_radius),-agent_movement_radius,agent_movement_radius)
+            agent_y_coordinate = environment_config_array[2] + clamp(floor(action[2] * env_cfg.agent_movement_range),-env_cfg.agent_movement_range,env_cfg.agent_movement_range)
             
 
             # Check agent collisions with outer walls
-            agent_y_coordinate = max(agent_y_coordinate,agent_radius) # Upper border
-            agent_y_coordinate = min(agent_y_coordinate,screen_height - agent_radius) # Lower bord.
-            agent_x_coordinate = min(agent_x_coordinate,screen_width - agent_radius) # Right border
-            agent_x_coordinate = max(agent_x_coordinate,agent_radius) # Left border
+            agent_y_coordinate = max(agent_y_coordinate,env_cfg.agent_radius) # Upper border
+            agent_y_coordinate = min(agent_y_coordinate,screen_height - env_cfg.agent_radius) # Lower bord.
+            agent_x_coordinate = min(agent_x_coordinate,screen_width - env_cfg.agent_radius) # Right border
+            agent_x_coordinate = max(agent_x_coordinate,env_cfg.agent_radius) # Left border
 
             # Get cell indizes of agents current position
-            cell_x = convert(Int32,ceil(agent_x_coordinate / maze_cell_size))
-            cell_y = convert(Int32,ceil(agent_y_coordinate / maze_cell_size))
+            cell_x = convert(Int32,ceil(agent_x_coordinate / env_cfg.maze_cell_size))
+            cell_y = convert(Int32,ceil(agent_y_coordinate / env_cfg.maze_cell_size))
 
             
             # Get coordinates of current cell
-            x_left = maze_cell_size * (cell_x - 1)
-            x_right = maze_cell_size * cell_x
-            y_bottom = maze_cell_size * (cell_y - 1)
-            y_top = maze_cell_size * cell_y
+            x_left = env_cfg.maze_cell_size * (cell_x - 1)
+            x_right = env_cfg.maze_cell_size * cell_x
+            y_bottom = env_cfg.maze_cell_size * (cell_y - 1)
+            y_top = env_cfg.maze_cell_size * cell_y
             # Check agent collisions with maze walls
 
             if maze[cell_y,cell_x,1] == 0 #check for Northern Wall
-                agent_y_coordinate = min(agent_y_coordinate,y_top - agent_radius)
+                agent_y_coordinate = min(agent_y_coordinate,y_top - env_cfg.agent_radius)
             end
             if maze[cell_y,cell_x,3] == 0 #check for Southern Wall
-                agent_y_coordinate = max(agent_y_coordinate,y_bottom + agent_radius)
+                agent_y_coordinate = max(agent_y_coordinate,y_bottom + env_cfg.agent_radius)
             end
             if maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
-                agent_x_coordinate = max(agent_x_coordinate,x_left + agent_radius)
+                agent_x_coordinate = max(agent_x_coordinate,x_left + env_cfg.agent_radius)
             end
 
             if maze[cell_y,cell_x,4] == 0 #check for Western Wall
-                agent_x_coordinate = min(agent_x_coordinate,x_right - agent_radius)
+                agent_x_coordinate = min(agent_x_coordinate,x_right - env_cfg.agent_radius)
             end
             # Check agent collision with top-left edge (prevents sneaking through the edge)
-            if (agent_x_coordinate - x_left < agent_radius) && ( agent_y_coordinate - y_top < agent_radius)
-                agent_x_coordinate = x_left + agent_radius
-                agent_y_coordinate = y_top + agent_radius
+            if (agent_x_coordinate - x_left < env_cfg.agent_radius) && ( agent_y_coordinate - y_top < env_cfg.agent_radius)
+                agent_x_coordinate = x_left + env_cfg.agent_radius
+                agent_y_coordinate = y_top + env_cfg.agent_radius
             end
 
             # Check agent collision with top-right edge (prevents sneaking through the edge)
-            if (x_right - agent_x_coordinate < agent_radius) && (agent_y_coordinate - y_top < agent_radius)
-                agent_x_coordinate = x_right - agent_radius
-                agent_y_coordinate = y_top + agent_radius
+            if (x_right - agent_x_coordinate < env_cfg.agent_radius) && (agent_y_coordinate - y_top < env_cfg.agent_radius)
+                agent_x_coordinate = x_right - env_cfg.agent_radius
+                agent_y_coordinate = y_top + env_cfg.agent_radius
             end
 
             # Check agent collision with bottom-right edge (prevents sneaking through the edge)
-            if (x_right - agent_x_coordinate < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
-                agent_x_coordinate = x_right - agent_radius
-                agent_y_coordinate = y_bottom - agent_radius
+            if (x_right - agent_x_coordinate < env_cfg.agent_radius) && (y_bottom - agent_y_coordinate < env_cfg.agent_radius)
+                agent_x_coordinate = x_right - env_cfg.agent_radius
+                agent_y_coordinate = y_bottom - env_cfg.agent_radius
             end
 
             # Check agent collision with bottom-left edge (prevents sneaking through the edge)
-            if (agent_x_coordinate - x_left < agent_radius) && (y_bottom - agent_y_coordinate < agent_radius)
-                agent_x_coordinate = x_left + agent_radius
-                agent_y_coordinate = y_bottom + agent_radius
+            if (agent_x_coordinate - x_left < env_cfg.agent_radius) && (y_bottom - agent_y_coordinate < env_cfg.agent_radius)
+                agent_x_coordinate = x_left + env_cfg.agent_radius
+                agent_y_coordinate = y_bottom + env_cfg.agent_radius
             end
             
             environment_config_array[1] = agent_x_coordinate
             environment_config_array[2] = agent_y_coordinate
 
             sensor_north =  begin
-                            sensor_distance = y_top - agent_y_coordinate - agent_radius
+                            sensor_distance = y_top - agent_y_coordinate - env_cfg.agent_radius
                             direction = 1
                             current_cell_x = cell_x
                             current_cell_y = cell_y
                             while true  
-                                if (current_cell_y + 1) > maze_rows
+                                if (current_cell_y + 1) > env_cfg.maze_rows
                                     break
                                 end
                                 current_cell_y += 1
                                 if maze[current_cell_y,current_cell_x,direction] == 0
                                     break
                                 else 
-                                    sensor_distance += maze_cell_size
+                                    sensor_distance += env_cfg.maze_cell_size
                                 end
                             end
                             sensor_distance
                             end
             sensor_east = begin
-                            sensor_distance = x_right - agent_x_coordinate - agent_radius
+                            sensor_distance = x_right - agent_x_coordinate - env_cfg.agent_radius
                             direction = 2
                             current_cell_x = cell_x
                             current_cell_y = cell_y
@@ -125,13 +220,13 @@ function env_step(maze,action,input,environment_config_array,agent_movement_radi
                                 if maze[current_cell_y,current_cell_x,direction] == 0
                                     break
                                 else 
-                                    sensor_distance += maze_cell_size
+                                    sensor_distance += env_cfg.maze_cell_size
                                 end
                             end
                             sensor_distance
                             end
             sensor_south = begin
-                            sensor_distance = agent_y_coordinate - y_bottom - agent_radius
+                            sensor_distance = agent_y_coordinate - y_bottom - env_cfg.agent_radius
                             direction = 3
                             current_cell_x = cell_x
                             current_cell_y = cell_y
@@ -143,25 +238,25 @@ function env_step(maze,action,input,environment_config_array,agent_movement_radi
                                 if maze[current_cell_y,current_cell_x,direction] == 0
                                     break
                                 else 
-                                    sensor_distance += maze_cell_size
+                                    sensor_distance += env_cfg.maze_cell_size
                                 end
                             end
                             sensor_distance
                             end
             sensor_west = begin
-                            sensor_distance = agent_x_coordinate - x_left - agent_radius
+                            sensor_distance = agent_x_coordinate - x_left - env_cfg.agent_radius
                             direction = 4
                             current_cell_x = cell_x
                             current_cell_y = cell_y
                             while true  
-                                if (current_cell_x + 1) > maze_columns
+                                if (current_cell_x + 1) > env_cfg.maze_columns
                                     break
                                 end
                                 current_cell_x += 1
                                 if maze[current_cell_y,current_cell_x,direction] == 0
                                     break
                                 else 
-                                    sensor_distance += maze_cell_size
+                                    sensor_distance += env_cfg.maze_cell_size
                                 end
                             end
                             sensor_distance
@@ -172,19 +267,19 @@ function env_step(maze,action,input,environment_config_array,agent_movement_radi
             rew = 0.0f0
             # Collect positive point in reach
             distance = sqrt((environment_config_array[3] - agent_x_coordinate) ^ 2 + (environment_config_array[4] - agent_y_coordinate) ^ 2)
-            if distance <= point_radius + agent_radius
+            if distance <= env_cfg.point_radius + env_cfg.agent_radius
                 #place new positive_point randomly in maze
-                environment_config_array[3] = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-                environment_config_array[4] = convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-                rew = reward_per_collected_positive_point
+                environment_config_array[3] = convert(Int32,(abs(rand(Int32)) % (env_cfg.maze_cell_size - (2*env_cfg.agent_radius))) + env_cfg.agent_radius +((abs(rand(Int32)) % env_cfg.maze_columns)) * env_cfg.maze_cell_size)
+                environment_config_array[4] = convert(Int32,(abs(rand(Int32)) % (env_cfg.maze_cell_size - (2*env_cfg.agent_radius))) + env_cfg.agent_radius +((abs(rand(Int32)) % env_cfg.maze_rows)) * env_cfg.maze_cell_size)
+                rew = env_cfg.reward_per_collected_positive_point
             end
             # Collect negative point in reach
             distance = sqrt((environment_config_array[5] - agent_x_coordinate) ^ 2 + (environment_config_array[6] - agent_y_coordinate) ^ 2)
-            if distance <= point_radius + agent_radius
+            if distance <= env_cfg.point_radius + env_cfg.agent_radius
                 #place new negative_point randomly in maze
-                environment_config_array[5] =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_columns)) * maze_cell_size)
-                environment_config_array[6] =  convert(Int32,(abs(rand(Int32)) % (maze_cell_size - (2*agent_radius))) + agent_radius +((abs(rand(Int32)) % maze_rows)) * maze_cell_size)
-                rew = reward_per_collected_negative_point
+                environment_config_array[5] =  convert(Int32,(abs(rand(Int32)) % (env_cfg.maze_cell_size - (2*env_cfg.agent_radius))) + env_cfg.agent_radius +((abs(rand(Int32)) % env_cfg.maze_columns)) * env_cfg.maze_cell_size)
+                environment_config_array[6] =  convert(Int32,(abs(rand(Int32)) % (env_cfg.maze_cell_size - (2*env_cfg.agent_radius))) + env_cfg.agent_radius +((abs(rand(Int32)) % env_cfg.maze_rows)) * env_cfg.maze_cell_size)
+                rew = env_cfg.reward_per_collected_negative_point
             end
 
 
