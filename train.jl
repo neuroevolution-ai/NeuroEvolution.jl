@@ -35,21 +35,19 @@ function main()
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
-    required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
+    required_shared_memory = continuous_time_rnn.get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
     for generation in 1:number_generations
 
         env_seed = Random.rand(number_validation_runs:maximum_env_seed)
         individuals = fill(0.0f0,number_individuals,free_parameters)
-        genomes = convert(Array{Array{Float32}},ask(optimizer))
+        genomes = ask(optimizer)
 
         #the optimizer generates the genomes as an Array of Arrays, which the GPU cannot work with, so the genomes need to be reshaped into a MxN matrix.
-        display(genomes)
         for i in 1:number_individuals
             for j in 1:free_parameters
                 individuals[i,j] = (genomes[i])[j]
             end
         end
-        display(individuals)
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0.0f0,number_individuals)
         @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seed,number_rounds,brain_cfg,environment_cfg)
