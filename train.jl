@@ -3,6 +3,8 @@ using Random
 using CUDA
 using BenchmarkTools
 using Statistics
+using Logging
+using Dates
 
 include("environments/collect_points_env.jl")
 include("brains/continuous_time_rnn.jl")
@@ -20,9 +22,9 @@ function main()
     brain = configuration["brain"]
     optimizer = configuration["optimizer"]
     brain_cfg = CTRNN_Cfg(brain["delta_t"],brain["number_neurons"],brain["clipping_range_min"],brain["clipping_range_max"],brain["alpha"])
-    environment_cfg = Collect_Points_Env_Cfg(environment["maze_columns"],environment["maze_rows"],environment["maze_cell_size"],environment["agent_radius"],environment["point_radius"],environment["agent_movement_range"],environment["reward_per_collected_positive_point"],environment["reward_per_collected_negative_point"],environment["number_time_steps"])
     number_inputs = get_number_inputs()
     number_outputs = get_number_outputs()
+    environment_cfg = Collect_Points_Env_Cfg(environment["maze_columns"],environment["maze_rows"],environment["maze_cell_size"],environment["agent_radius"],environment["point_radius"],environment["agent_movement_range"],environment["reward_per_collected_positive_point"],environment["reward_per_collected_negative_point"],environment["number_time_steps"],number_inputs,number_outputs)
     number_individuals = optimizer["population_size"]
     brain_state = generate_brain_state(number_inputs,number_outputs,brain)
     free_parameters = get_individual_size(brain_state)
@@ -33,7 +35,6 @@ function main()
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
-
     required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
     for generation in 1:number_generations
 
@@ -50,10 +51,8 @@ function main()
 
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0f0,number_individuals)
-        println("start Generation:",generation)
         @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed),number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
-        println("finished Generation:",generation)
         rewards_training = Array(fitness_results)
 
         tell(optimizer,rewards_training)
@@ -79,10 +78,9 @@ function main()
             best_reward_overall = best_reward_current_generation
         end
         
-        
+        println("Generation:",generation," Highest Reward overall:",best_reward_overall)
     end
-    display(best_reward_overall)
-    display(best_genome_overall)
+
 end
 
 main()

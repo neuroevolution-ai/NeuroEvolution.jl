@@ -11,6 +11,8 @@ struct Collect_Points_Env_Cfg
     reward_per_collected_positive_point::Float32
     reward_per_collected_negative_point::Float32
     number_time_steps::Int32
+    number_inputs::Int64
+    number_outputs::Int64
 end
 function Adapt.adapt_structure(to,env::Collect_Points_Env_Cfg)
     maze_columns = Adapt.adapt_structure(to, env.maze_columns)
@@ -22,8 +24,10 @@ function Adapt.adapt_structure(to,env::Collect_Points_Env_Cfg)
     reward_per_collected_positive_point = Adapt.adapt_structure(to, env.reward_per_collected_positive_point)
     reward_per_collected_negative_point = Adapt.adapt_structure(to, env.reward_per_collected_negative_point)
     number_time_steps = Adapt.adapt_structure(to, env.number_time_steps)
+    number_inputs = Adapt.adapt_structure(to,env.number_inputs)
+    number_outputs = Adapt.adapt_structure(to,env.number_outputs)
 
-    Collect_Points_Env_Cfg(maze_columns,maze_rows,maze_cell_size,agent_radius,point_radius,agent_movement_range,reward_per_collected_positive_point,reward_per_collected_negative_point,number_time_steps)
+    Collect_Points_Env_Cfg(maze_columns,maze_rows,maze_cell_size,agent_radius,point_radius,agent_movement_range,reward_per_collected_positive_point,reward_per_collected_negative_point,number_time_steps,number_inputs,number_outputs)
 end
 function place_agent_randomly_in_maze(environment_cfg)
     x_coordinate = convert(Int32,(abs(rand(Int32)) % (environment_cfg.maze_cell_size - (2*environment_cfg.agent_radius))) + environment_cfg.agent_radius +((abs(rand(Int32)) % environment_cfg.maze_columns)) * environment_cfg.maze_cell_size)
@@ -362,14 +366,15 @@ function create_maze(maze,env_cfg::Collect_Points_Env_Cfg, offset)#neighbours,x_
 
         move_x_coordinate = 0
         move_y_coordinate = 0
-        #step3: choose random neighbor through Random state
+
+        #step3: choose random neighbor to move to
         rand_index = (abs(rand(Int32)) % 4) 
         for i in 1:4
             index = ((rand_index+i) % 4) + 1
             if neighbours[index] == 1
                 if index == 3
                     move_y_coordinate = 1
-                break
+                    break
                 end
                 if index == 1
                     move_x_coordinate = 1
@@ -385,8 +390,8 @@ function create_maze(maze,env_cfg::Collect_Points_Env_Cfg, offset)#neighbours,x_
                 end
             end
         end
-            #step4: knock down the wall between the cells for both cells
-            
+
+        #step4: knock down the wall between the cells for both cells   
         if move_x_coordinate == 1 
             maze[cell_y_coordinate,cell_x_coordinate,2] = 1
             maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,4] = 1
@@ -403,6 +408,7 @@ function create_maze(maze,env_cfg::Collect_Points_Env_Cfg, offset)#neighbours,x_
             maze[cell_y_coordinate,cell_x_coordinate,3] = 1
             maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,1] = 1
         end
+
         #step5: add origin cell to stack
         x_coordinate_stack[cell_stack_index] = cell_x_coordinate
         y_coordinate_stack[cell_stack_index] = cell_y_coordinate

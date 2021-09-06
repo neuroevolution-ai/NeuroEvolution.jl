@@ -5,21 +5,16 @@ using Random
 
 
 function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_cfg::CTRNN_Cfg,environment_cfg::Collect_Points_Env_Cfg)
-    #Dynamic Memory necessary to be allotted: sizeof(Float32) * (number_neurons * input_size + number_neurons * number_neurons + number_neurons * output_size + input_size + number_neurons + number_neurons + output_size) + sizeof(Int32) * (maze_columns * maze_rows * 4 + 12 + maze_columns * maze_rows + 4)
-    #Init Variables
-    #####################################################
+
     tx = threadIdx().x
-    input_size = 10
-    output_size = 2
     fitness_total = 0
-    #####################################################
-    #offset = 0
 
-    V = @cuDynamicSharedMem(Float32,(brain_cfg.number_neurons,input_size))
+
+    V = @cuDynamicSharedMem(Float32,(brain_cfg.number_neurons,environment_cfg.number_inputs))
     W = @cuDynamicSharedMem(Float32,(brain_cfg.number_neurons,brain_cfg.number_neurons),sizeof(V))
-    T = @cuDynamicSharedMem(Float32,(output_size,brain_cfg.number_neurons),sizeof(V)+sizeof(W))
+    T = @cuDynamicSharedMem(Float32,(environment_cfg.number_outputs,brain_cfg.number_neurons),sizeof(V)+sizeof(W))
 
-    input = @cuDynamicSharedMem(Float32,input_size,sizeof(V)+sizeof(W)+sizeof(T))
+    input = @cuDynamicSharedMem(Float32,environment_cfg.number_inputs,sizeof(V)+sizeof(W)+sizeof(T))
 
     sync_threads()
   
@@ -31,7 +26,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_c
 
 
     temp_V = @cuDynamicSharedMem(Float32,brain_cfg.number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(x))
-    action = @cuDynamicSharedMem(Float32,output_size,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x))
+    action = @cuDynamicSharedMem(Float32,environment_cfg.number_outputs,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x))
  
     maze = @cuDynamicSharedMem(Int32,(environment_cfg.maze_columns,environment_cfg.maze_rows,4),sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)) 
     environment_config_array = @cuDynamicSharedMem(Int32,6,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input)+sizeof(temp_V)+sizeof(x)+sizeof(action)+sizeof(maze))  # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate]
@@ -49,7 +44,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_c
         fitness_current = 0
         
         if tx == 1
-            create_maze(maze,environment_cfg, offset)#neighbours,x_coordinate_stack,y_coordinate_stack)
+            create_maze(maze,environment_cfg, offset)
         end
 
         #Place agent, positive_point, negative_point randomly in maze
@@ -63,6 +58,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_c
             @inbounds environment_config_array[5],environment_config_array[6] = place_agent_randomly_in_maze(environment_cfg)
         end
         sync_threads()
+
         if tx==1
             get_observation(maze,input,environment_config_array,environment_cfg)
         end

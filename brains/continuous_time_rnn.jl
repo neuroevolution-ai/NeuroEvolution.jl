@@ -27,6 +27,7 @@ function brain_initialize(threadID,blockID, V,W,T, individuals)
     output_size = size(T,1)
     v_size = input_size * number_neurons
     w_size = number_neurons * number_neurons
+    #initialize the brain_masks from the genome and set all Values on the diagonal of W negative
     for i in 1:input_size
         @inbounds V[threadID,i] = individuals[blockID,i+((threadID-1)*input_size)]  
     end
@@ -46,20 +47,24 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action,brain_cfg::CTRNN
     input_size = size(V,2)
     output_size = size(T,1)
 
-    #V*input matmul:
+    #V * input multiplication
     V_value = 0.0f0
     for i = 1:input_size 
         @inbounds V_value += V[threadID, i] * input[i] 
     end
+    #
     @inbounds temp_V[threadID] = tanh(x[threadID] + V_value) 
-    #W*temp_V matmul:
+
+    #W * result of Vmult
     W_value = 0.0f0
     for i = 1:brain_cfg.number_neurons 
         @inbounds W_value = W[threadID, i] * temp_V[i] + W_value
     end
+    #
     @inbounds x[threadID] += (brain_cfg.delta_t * ((-brain_cfg.alpha * x[threadID]) + W_value))
     @inbounds x[threadID] = clamp(x[threadID],brain_cfg.clipping_range_min,brain_cfg.clipping_range_max)
     sync_threads()
+
     #T*temp_W matmul:
     if threadID <= output_size
         T_value = 0.0f0
@@ -68,6 +73,7 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action,brain_cfg::CTRNN
         end
         @inbounds action[threadID] = tanh(T_value)
     end
+    #
     return
 end
 
