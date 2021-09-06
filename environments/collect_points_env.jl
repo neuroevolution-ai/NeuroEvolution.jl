@@ -317,8 +317,8 @@ function create_maze(maze,env_cfg::Collect_Points_Env_Cfg, offset)#neighbours,x_
     amount_of_cells_visited = 1
     cell_stack_index = 1
         for j in 1:4
-            for k in 1:5
-                for l in 1:5
+            for k in 1:env_cfg.maze_rows
+                for l in 1:env_cfg.maze_columns
                     @inbounds maze[l,k,j] = convert(Int32,0)
                 end
             end

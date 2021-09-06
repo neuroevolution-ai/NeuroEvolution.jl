@@ -38,7 +38,7 @@ function main()
     required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
     for generation in 1:number_generations
 
-        env_seed = Random.rand((number_validation_runs:maximum_env_seed), 1)
+        env_seed = Random.rand(number_validation_runs:maximum_env_seed)
         individuals = fill(0.0f0,number_individuals,free_parameters)
         genomes = convert(Array{Array{Float32}},ask(optimizer))
 
@@ -51,10 +51,10 @@ function main()
 
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0f0,number_individuals)
-        @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,CuArray(env_seed),number_rounds,brain_cfg,environment_cfg)
+        @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seed,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
-
+        display(rewards_training)
         tell(optimizer,rewards_training)
         best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
 
@@ -67,7 +67,7 @@ function main()
                 validation_individuals[i,j] = best_genome_current_generation[j]
             end
         end
-        @cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_fitness(CuArray(validation_individuals),rewards_validation, CuArray(env_seeds), 1,brain_cfg,environment_cfg)
+        @cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_validation(CuArray(validation_individuals),rewards_validation,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_validation_cpu = Array(rewards_validation)
 
@@ -78,7 +78,8 @@ function main()
             best_reward_overall = best_reward_current_generation
         end
         
-        println("Generation:",generation," Highest Reward overall:",best_reward_overall)
+        #println("Generation:",generation," result:",rewards_training[1])
+        #println("Generation:",generation," best_reward_current_generation:",best_reward_current_generation," Highest Reward overall:",best_reward_overall)
     end
 
 end

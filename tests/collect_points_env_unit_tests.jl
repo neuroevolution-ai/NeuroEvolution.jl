@@ -5,7 +5,7 @@ include("D:/NeuroEvolution.jl/environments/collect_points_env.jl")
 
 function make_maze_kernel(maze,env_cfg,env_seed)
     if threadIdx().x == 1
-        Random.seed!(Random.default_rng(),env_seed)
+        Random.seed!(Random.default_rng(threadIdx().x),env_seed)
     end
     create_maze(maze,env_cfg,0)
     return
