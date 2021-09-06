@@ -21,7 +21,9 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_c
     brain_initialize(tx,blockIdx().x, V,W,T,individuals)
 
     sync_threads()
-
+    if tx == 1
+        @cuprintln("Block:",blockIdx().x," second Value:",V[2])
+    end
     x = @cuDynamicSharedMem(Float32,brain_cfg.number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input))
 
 

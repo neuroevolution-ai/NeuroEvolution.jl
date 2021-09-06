@@ -29,15 +29,15 @@ function brain_initialize(threadID,blockID, V,W,T, individuals)
     w_size = number_neurons * number_neurons
     #initialize the brain_masks from the genome and set all Values on the diagonal of W negative
     for i in 1:input_size
-        @inbounds V[threadID,i] = individuals[blockID,i+((threadID-1)*input_size)]  
+        @inbounds V[threadID,i] = individuals[blockID,threadID+((i-1)*number_neurons)]  
     end
     sync_threads()
     for i in 1:number_neurons
-        @inbounds W[threadID,i] = individuals[blockID,v_size+(i+((threadID-1)*number_neurons))]
+        @inbounds W[threadID,i] = individuals[blockID,v_size+(threadID+((i-1)*number_neurons))]
     end
     @inbounds W[threadID,threadID] = -abs(W[threadID,threadID])
     for i in 1:output_size
-        @inbounds T[i,threadID] = individuals[blockID,v_size+w_size+(threadID+((i-1)*number_neurons))]
+        @inbounds T[i,threadID] = individuals[blockID,v_size+w_size+(i+((threadID-1)*output_size))]
     end
 
     return

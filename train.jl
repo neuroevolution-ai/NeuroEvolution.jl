@@ -43,24 +43,21 @@ function main()
         genomes = convert(Array{Array{Float32}},ask(optimizer))
 
         #the optimizer generates the genomes as an Array of Arrays, which the GPU cannot work with, so the genomes need to be reshaped into a MxN matrix.
+        display(genomes)
         for i in 1:number_individuals
             for j in 1:free_parameters
                 individuals[i,j] = (genomes[i])[j]
             end
         end
-
+        display(individuals)
         individuals_gpu = CuArray(individuals) 
-        fitness_results = CUDA.fill(0f0,number_individuals)
+        fitness_results = CUDA.fill(0.0f0,number_individuals)
         @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seed,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
-        display(rewards_training)
         tell(optimizer,rewards_training)
         best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
-
-
-        env_seeds = Array(1:number_validation_runs)
-        rewards_validation = CUDA.fill(0f0,number_validation_runs)
+        rewards_validation = CUDA.fill(0.0f0,number_validation_runs)
         validation_individuals = fill(0.0f0,number_validation_runs,free_parameters)
         for i in 1:number_validation_runs
             for j in 1:free_parameters
@@ -72,7 +69,7 @@ function main()
         rewards_validation_cpu = Array(rewards_validation)
 
         
-        best_reward_current_generation = mean(rewards_validation)
+        best_reward_current_generation = mean(rewards_validation_cpu)
         if best_reward_current_generation > best_reward_overall
             best_genome_overall = best_genome_current_generation
             best_reward_overall = best_reward_current_generation
