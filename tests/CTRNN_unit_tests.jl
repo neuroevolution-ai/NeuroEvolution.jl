@@ -11,7 +11,7 @@ function kernel_test_brain_step(V,W,T,x,temp_V,input,action,brain_cfg)
 	return
 end
 function kernel_test_initialize(V,W,T,individuals)
-
+	bx = blockIdx().x
 
 
 	brain_initialize(threadIdx().x,1,V,W,T,individuals)

@@ -35,7 +35,7 @@ function main()
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
-    required_shared_memory = continuous_time_rnn.get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
+    required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
     for generation in 1:number_generations
 
         env_seed = Random.rand(number_validation_runs:maximum_env_seed)
