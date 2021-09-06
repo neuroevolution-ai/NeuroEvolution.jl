@@ -79,7 +79,7 @@ function main()
         end
         
         #println("Generation:",generation," result:",rewards_training[1])
-        #println("Generation:",generation," best_reward_current_generation:",best_reward_current_generation," Highest Reward overall:",best_reward_overall)
+        println("Generation:",generation," best_reward_current_generation:",best_reward_current_generation," Highest Reward overall:",best_reward_overall)
     end
 
 end
