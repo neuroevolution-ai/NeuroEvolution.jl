@@ -61,7 +61,8 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action,brain_cfg::CTRNN
         @inbounds W_value = W[threadID, i] * temp_V[i] + W_value
     end
     #
-    @inbounds x[threadID] += (brain_cfg.delta_t * ((-brain_cfg.alpha * x[threadID]) + W_value))
+    dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
+    @inbounds x[threadID] += (brain_cfg.delta_t * dx_dt)
     @inbounds x[threadID] = clamp(x[threadID],brain_cfg.clipping_range_min,brain_cfg.clipping_range_max)
     sync_threads()
 

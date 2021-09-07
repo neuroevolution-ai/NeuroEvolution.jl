@@ -37,8 +37,9 @@ function main()
     best_reward_overall = typemin(Int32)
     required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
     for generation in 1:number_generations
-
+        start_time_generation = now()
         env_seed = Random.rand(number_validation_runs:maximum_env_seed)
+        env_seeds_gpu = CUDA.fill(env_seed,number_individuals)
         individuals = fill(0.0f0,number_individuals,free_parameters)
         genomes = ask(optimizer)
 
@@ -50,7 +51,7 @@ function main()
         end
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0.0f0,number_individuals)
-        @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seed,number_rounds,brain_cfg,environment_cfg)
+        @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seeds_gpu,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
         tell(optimizer,rewards_training)
@@ -62,7 +63,9 @@ function main()
                 validation_individuals[i,j] = best_genome_current_generation[j]
             end
         end
-        @cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_validation(CuArray(validation_individuals),rewards_validation,brain_cfg,environment_cfg)
+        env_seeds_validation = 1:number_validation_runs
+
+        @cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_fitness(CuArray(validation_individuals),rewards_validation,CuArray(env_seeds_validation),1,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_validation_cpu = Array(rewards_validation)
 
@@ -73,8 +76,9 @@ function main()
             best_reward_overall = best_reward_current_generation
         end
         
-        #println("Generation:",generation," result:",rewards_training[1])
-        println("Generation:",generation," best_reward_current_generation:",best_reward_current_generation," Highest Reward overall:",best_reward_overall)
+        elapsed_time_current_generation = now() - start_time_generation
+        elapsed_time_current_generation = string(Second(floor(elapsed_time_current_generation,Second))) * string(elapsed_time_current_generation % 1000)
+        println("Generation:",generation," Min:",findmin(rewards_training)[1]," Mean:",mean(rewards_training)," Max:",findmax(rewards_training)[1]," Best:",best_reward_overall," elapsed time (s):",elapsed_time_current_generation)
     end
 
 end
