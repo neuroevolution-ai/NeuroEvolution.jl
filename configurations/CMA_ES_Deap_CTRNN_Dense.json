@@ -19,7 +19,7 @@
   "brain": {
     "type": "CTRNN",
     "delta_t": 0.05,
-    "number_neurons": 50,
+    "number_neurons": 100,
     "differential_equation": "original",
     "clipping_range_min": -1.0,
     "clipping_range_max": 1.0,
