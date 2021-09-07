@@ -11,10 +11,12 @@ function make_maze_kernel(maze,env_cfg,env_seed)
     return
 end
 
-function kernel_env_step_test()
+function kernel_env_step_test(maze,agent_position,env_cfg)
 
+
+    return
 end
-function env_step_cpu(maze,agent_x_coordinate,agent_y_coordinate,action,env_cfg::Collect_Points_Env_Cfg)
+function env_step_cpu(maze,agent_x_coordinate,agent_y_coordinate,input,action,env_cfg::Collect_Points_Env_Cfg)
     screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
     screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
     agent_x_coordinate = agent_x_coordinate + clamp(floor(action[1] * env_cfg.agent_movement_range),-env_cfg.agent_movement_range,env_cfg.agent_movement_range)
@@ -71,8 +73,7 @@ function env_step_cpu(maze,agent_x_coordinate,agent_y_coordinate,action,env_cfg:
         agent_x_coordinate = x_left + env_cfg.agent_radius
         agent_y_coordinate = y_bottom + env_cfg.agent_radius
     end
-    display(agent_x_coordinate)
-    display(agent_y_coordinate)
+
 end
 @testset "Maze" begin
 env_seed = 100
@@ -88,5 +89,6 @@ display(maze_cpu)
 input = [1.0f0,1.0f0]
 x_coordinate = 380
 y_coordinate = 380
-    env_step_cpu(maze_cpu,x_coordinate,y_coordinate,input,env_cfg)
+#env_step_cpu(maze_cpu,x_coordinate,y_coordinate,action,env_cfg)
+
 end

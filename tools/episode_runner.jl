@@ -75,6 +75,7 @@ function kernel_eval_fitness(individuals,results, env_seed,number_rounds,brain_c
                     #@cuprintln("neg_point_x_coord:",environment_config_array[5]," neg_point_y_coord:",environment_config_array[6])
                 end
                 rew = env_step(maze,action,input,environment_config_array,environment_cfg)
+
                 fitness_current += rew
             end
             sync_threads()

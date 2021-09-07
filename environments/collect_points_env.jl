@@ -173,10 +173,10 @@ function env_step(maze,action,input,environment_config_array,env_cfg::Collect_Po
         agent_y_coordinate = max(agent_y_coordinate,y_bottom + env_cfg.agent_radius)
     end
     if maze[cell_y,cell_x,2] == 0 #check for Eastern Wall
-        agent_x_coordinate = max(agent_x_coordinate,x_left + env_cfg.agent_radius)
+        agent_x_coordinate = min(agent_x_coordinate,x_right - env_cfg.agent_radius)
     end
     if maze[cell_y,cell_x,4] == 0 #check for Western Wall
-        agent_x_coordinate = min(agent_x_coordinate,x_right - env_cfg.agent_radius)
+        agent_x_coordinate = max(agent_x_coordinate,x_left + env_cfg.agent_radius)
     end
     # Check agent collision with top-left edge (prevents sneaking through the edge)
     if (agent_x_coordinate - x_left < env_cfg.agent_radius) && ( agent_y_coordinate - y_top < env_cfg.agent_radius)
@@ -319,7 +319,7 @@ function create_maze(maze,env_cfg::Collect_Points_Env_Cfg, offset)#neighbours,x_
         for j in 1:4
             for k in 1:env_cfg.maze_rows
                 for l in 1:env_cfg.maze_columns
-                    @inbounds maze[l,k,j] = convert(Int32,0)
+                    @inbounds maze[k,l,j] = convert(Int32,0)
                 end
             end
         end
