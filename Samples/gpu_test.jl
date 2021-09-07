@@ -193,6 +193,26 @@ function kernel_env_step(maze,action,input,environment_config_array)
     if maze[cell_y,cell_x,4] == 1 #check for Western Wall
         agent_x_coordinate = max(agent_x_coordinate,x_left + env_cfg.agent_radius)
     end
+    # Check agent collision with top-left edge (prevents sneaking through the edge)
+    if (agent_x_coordinate - x_left < env_cfg.agent_radius) && (y_top - agent_y_coordinate < env_cfg.agent_radius)
+        agent_x_coordinate = x_left + env_cfg.agent_radius
+        agent_y_coordinate = y_top - env_cfg.agent_radius
+    end
+    # Check agent collision with top-right edge (prevents sneaking through the edge)
+    if (x_right - agent_x_coordinate < env_cfg.agent_radius) && (y_top - agent_y_coordinate < env_cfg.agent_radius)
+        agent_x_coordinate = x_right - env_cfg.agent_radius
+        agent_y_coordinate = y_top - env_cfg.agent_radius
+    end
+    # Check agent collision with bottom-right edge (prevents sneaking through the edge)
+    if (x_right - agent_x_coordinate < env_cfg.agent_radius) && (agent_y_coordinate - y_bottom < env_cfg.agent_radius)
+        agent_x_coordinate = x_right - env_cfg.agent_radius
+        agent_y_coordinate = y_bottom + env_cfg.agent_radius
+    end
+    # Check agent collision with bottom-left edge (prevents sneaking through the edge)
+    if (agent_x_coordinate - x_left < env_cfg.agent_radius) && (agent_y_coordinate - y_bottom < env_cfg.agent_radius)
+        agent_x_coordinate = x_left + env_cfg.agent_radius
+        agent_y_coordinate = y_bottom + env_cfg.agent_radius
+    end
 end
 
 maze_columns = 5
