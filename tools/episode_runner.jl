@@ -35,7 +35,7 @@ function kernel_eval_fitness(individuals,results, env_seeds,number_rounds,brain_
 
     for j in 1:number_rounds
         if threadIdx().x == 1
-            Random.seed!(Random.default_rng(),env_seeds[blockIdx().x]+j)
+            @inbounds Random.seed!(Random.default_rng(),env_seeds[blockIdx().x]+j)
         end
         sync_threads()
         #reset brain

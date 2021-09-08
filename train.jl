@@ -44,9 +44,6 @@ function main()
     form = DateFormat("yyyy-mm-dd_HH-MM-SS")
     a = floor(start_time_training,Second)
 
-    result_directory = "Simulation_results/"*Dates.format(a,form)
-
-    mkdir(result_directory)
     log = OrderedDict()
  
     for generation in 1:number_generations
@@ -67,7 +64,7 @@ function main()
         @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seeds_gpu,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
-        #tell(optimizer,rewards_training)
+        tell(optimizer,rewards_training)
         best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
         rewards_validation = CUDA.fill(0.0f0,number_validation_runs)
         validation_individuals = fill(0.0f0,number_validation_runs,free_parameters)
@@ -101,7 +98,9 @@ function main()
         log[generation] = log_line
         println("Generation:",generation," Min:",findmin(rewards_training)[1]," Mean:",mean(rewards_training)," Max:",findmax(rewards_training)[1]," Best:",best_reward_overall," elapsed time (s):",elapsed_time_current_generation)
     end
+    result_directory = "Simulation_results/"*Dates.format(a,form)
 
+    mkdir(result_directory)
     write_results_to_textfile(result_directory*"/Log.txt",configuration,log,number_inputs,number_outputs,number_individuals,free_parameters,now()-start_time_training)
 end
 
