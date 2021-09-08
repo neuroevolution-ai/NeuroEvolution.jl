@@ -90,7 +90,7 @@ function _generate_mask(n :: Int, m :: Int)
     return trues(n,m)
 end
 
-function generate_brain_state(input_size,output_size,configuration::Dict)
+function generate_brain_state(input_size,output_size,configuration)
     v_mask = _generate_mask(configuration["number_neurons"], input_size)
     w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
     t_mask = _generate_mask(output_size, configuration["number_neurons"])

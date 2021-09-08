@@ -5,14 +5,16 @@ using BenchmarkTools
 using Statistics
 using Logging
 using Dates
+using DataStructures
 
 include("environments/collect_points_env.jl")
 include("brains/continuous_time_rnn.jl")
 include("optimizers/optimizer.jl")
 include("tools/episode_runner.jl")
+include("tools/write_results.jl")
 
 function main()
-    configuration = JSON.parsefile("configurations/CMA_ES_Deap_CTRNN_Dense.json")
+    configuration = JSON.parsefile("configurations/CMA_ES_Deap_CTRNN_Dense.json",dicttype=DataStructures.OrderedDict)
 
     number_generations = configuration["number_generations"]
     number_validation_runs = configuration["number_validation_runs"]
@@ -36,6 +38,17 @@ function main()
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
     required_shared_memory = get_memory_requirements(number_inputs,number_outputs, brain_cfg) + get_memory_requirements(environment_cfg)
+    start_time_training = now()
+
+
+    form = DateFormat("yyyy-mm-dd_HH-MM-SS")
+    a = floor(start_time_training,Second)
+
+    result_directory = "Simulation_results/"*Dates.format(a,form)
+
+    mkdir(result_directory)
+    log = OrderedDict()
+ 
     for generation in 1:number_generations
         start_time_generation = now()
         env_seed = Random.rand(number_validation_runs:maximum_env_seed)
@@ -78,9 +91,18 @@ function main()
         
         elapsed_time_current_generation = now() - start_time_generation
         elapsed_time_current_generation = string(Second(floor(elapsed_time_current_generation,Second))) * string(elapsed_time_current_generation % 1000)
+        log_line = OrderedDict()
+        log_line["gen"] = generation
+        log_line["min"] = minimum(rewards_training)
+        log_line["mean"] = mean(rewards_training)
+        log_line["max"] = maximum(rewards_training)
+        log_line["best"] = best_reward_overall
+        log_line["elapsed_time"] = elapsed_time_current_generation
+        log[generation] = log_line
         println("Generation:",generation," Min:",findmin(rewards_training)[1]," Mean:",mean(rewards_training)," Max:",findmax(rewards_training)[1]," Best:",best_reward_overall," elapsed time (s):",elapsed_time_current_generation)
     end
 
+    write_results_to_textfile(result_directory*"/Log.txt",configuration,log,number_inputs,number_outputs,number_individuals,free_parameters,now()-start_time_training)
 end
 
 main()
