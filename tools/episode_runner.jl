@@ -43,7 +43,7 @@ function kernel_eval_fitness(individuals,results, env_seeds,number_rounds,brain_
         fitness_current = 0
         
         if tx == 1
-            create_maze(maze,environment_cfg, offset)
+            #create_maze(maze,environment_cfg, offset)
         end
 
         #Place agent, positive_point, negative_point randomly in maze
@@ -68,12 +68,12 @@ function kernel_eval_fitness(individuals,results, env_seeds,number_rounds,brain_
         #Loop through Timesteps
         #################################################
         for index in 1:environment_cfg.number_time_steps
-            brain_step(tx,temp_V, V, W, T, x, input, action,brain_cfg)
+            #brain_step(tx,temp_V, V, W, T, x, input, action,brain_cfg)
             sync_threads()
             if tx == 1
-                rew = env_step(maze,action,input,environment_config_array,environment_cfg)
+                #rew = env_step(maze,action,input,environment_config_array,environment_cfg)
 
-                fitness_current += rew
+                #fitness_current += rew
             end
             sync_threads()
         end
