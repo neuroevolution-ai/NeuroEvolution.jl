@@ -73,7 +73,7 @@ function kernel_eval_fitness(individuals,results, env_seeds,number_rounds,brain_
             if tx == 1
                 #rew = env_step(maze,action,input,environment_config_array,environment_cfg)
 
-                fitness_current += rew
+                #fitness_current += rew
             end
             sync_threads()
         end
