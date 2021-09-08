@@ -61,7 +61,7 @@ function main()
         end
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0.0f0,number_individuals)
-        @cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seeds_gpu,number_rounds,brain_cfg,environment_cfg)
+        #@cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seeds_gpu,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
         tell(optimizer,rewards_training)
@@ -75,7 +75,7 @@ function main()
         end
         env_seeds_validation = 1:number_validation_runs
 
-        @cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_fitness(CuArray(validation_individuals),rewards_validation,CuArray(env_seeds_validation),1,brain_cfg,environment_cfg)
+        #@cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_fitness(CuArray(validation_individuals),rewards_validation,CuArray(env_seeds_validation),1,brain_cfg,environment_cfg)
         CUDA.synchronize()
         rewards_validation_cpu = Array(rewards_validation)
 
