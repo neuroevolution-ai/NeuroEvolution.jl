@@ -18,7 +18,7 @@ function kernel_eval_fitness(individuals,results, env_seeds,number_rounds,brain_
 
     sync_threads()
   
-    brain_initialize(tx,blockIdx().x, V,W,T,individuals)
+    #brain_initialize(tx,blockIdx().x, V,W,T,individuals)
 
     sync_threads()
     x = @cuDynamicSharedMem(Float32,brain_cfg.number_neurons,sizeof(V)+sizeof(W)+sizeof(T)+sizeof(input))
