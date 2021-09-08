@@ -54,12 +54,12 @@ function main()
         genomes = ask(optimizer)
 
         #the optimizer generates the genomes as an Array of Arrays, which the GPU cannot work with, so the genomes need to be reshaped into a MxN matrix.
-        for i in 1:number_individuals
-            for j in 1:free_parameters
-                individuals[i,j] = (genomes[i])[j]
-            end
-        end
-        individuals_gpu = CuArray(individuals) 
+        #for i in 1:number_individuals
+        #    for j in 1:free_parameters
+        #        individuals[i,j] = (genomes[i])[j]
+        #    end
+        #end
+        #individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0.0f0,number_individuals)
         #@cuda threads=brain_cfg.number_neurons blocks=number_individuals shmem=required_shared_memory kernel_eval_fitness(individuals_gpu,fitness_results,env_seeds_gpu,number_rounds,brain_cfg,environment_cfg)
         CUDA.synchronize()
@@ -68,11 +68,11 @@ function main()
         best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
         rewards_validation = CUDA.fill(0.0f0,number_validation_runs)
         validation_individuals = fill(0.0f0,number_validation_runs,free_parameters)
-        for i in 1:number_validation_runs
-            for j in 1:free_parameters
-                validation_individuals[i,j] = best_genome_current_generation[j]
-            end
-        end
+        #for i in 1:number_validation_runs
+            #for j in 1:free_parameters
+                #validation_individuals[i,j] = best_genome_current_generation[j]
+            #end
+        #end
         env_seeds_validation = 1:number_validation_runs
 
         #@cuda threads=brain_cfg.number_neurons blocks=number_validation_runs shmem=required_shared_memory kernel_eval_fitness(CuArray(validation_individuals),rewards_validation,CuArray(env_seeds_validation),1,brain_cfg,environment_cfg)
