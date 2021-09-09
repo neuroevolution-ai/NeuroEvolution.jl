@@ -20,6 +20,7 @@ function Adapt.adapt_structure(to, itp::Interpolate)
     Interpolate(xs, ys)
 end
 
+
 function kernel(itp::Interpolate)
     @cuprintln("1")
     return
@@ -28,46 +29,30 @@ end
 #@cuda kernel(itp)
 
 
-struct TestStruct{A}
-    x::A
-    y::A
-    z::Int
+struct TestStruct
+    x::Int
+    y::Int
 end
 function Adapt.adapt_structure(to, test::TestStruct)
     x = Adapt.adapt_structure(to, test.x)
     y = Adapt.adapt_structure(to, test.y)
-    z = Adapt.adapt_structure(to, test.z)
-    TestStruct(x, y, z)
+    TestStruct(x, y)
 end
-function kernel(test::TestStruct)
-    
-    test2 = TestStruct(test.x,test.y, test.z+1)
-    test = test2
-    @cuprintln(test.x[1])
-    @cuprintln(test.y[1])
-    @cuprintln(test.z)
 
+function create_struct(a,b)
+    test_struct = TestStruct(a,b)
+    return test_struct
+end
+
+function kernel()
+    a = 10
+    b = 20
+    test = create_struct(a,b)
+    @cuprintln(test.a)
+    @cuprintln(test.b)
     return
 end
 
-x = CUDA.fill(1.0,10)
-y = CUDA.fill(2.0,10)
-itp = Interpolate(x,y)
-#itp = Interpolate(CuArray(xs_cpu), CuArray(ys_cpu))
-#display(itp)
-#pts = CuArray(pts_cpu);
-#display(pts)
-#result = itp.(pts)
-#display(result)
+@device_code_warntype @cuda kernel()
 
 
-
-#=
-which structs are necessary:
--Environment
--Brain
--EpisodeRunner
-
-
-
-=#
