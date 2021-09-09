@@ -55,10 +55,12 @@ function main()
         genomes = ask(optimizer)
 
         #the optimizer generates the genomes as an Array of Arrays, which the GPU cannot work with, so the genomes need to be reshaped into a MxN matrix.
+        @time begin
         for i in 1:number_individuals
             for j in 1:free_parameters
                 individuals[i,j] = (genomes[i])[j]
             end
+        end
         end
         individuals_gpu = CuArray(individuals) 
         fitness_results = CUDA.fill(0.0f0,number_individuals)
