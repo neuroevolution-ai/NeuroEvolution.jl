@@ -40,4 +40,6 @@ for generation in 1:number_generations
             individuals[i,j] = (genomes[i])[j]
         end
     end
+    rewards_training = 100 .* rand(Float32,number_individuals)
+    tell(optimizer,rewards_training)
 end
