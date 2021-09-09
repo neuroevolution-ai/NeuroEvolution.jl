@@ -6,6 +6,7 @@ using Statistics
 using Logging
 using Dates
 using DataStructures
+using PyCall
 
 include("optimizers/optimizer.jl")
 include("environments/collect_points_env.jl")
@@ -31,11 +32,12 @@ number_individuals = optimizer["population_size"]
 brain_state = generate_brain_state(number_inputs,number_outputs,brain)
 free_parameters = get_individual_size(brain_state)
 
-optimizer = inititalize_optimizer(free_parameters,optimizer)
+optimizer = pyimport("cma_es_deap")
+opt = optimizer.OptimizerCmaEsDeap(free_parameters,optimizer)
 
 for generation in 1:number_generations
     individuals = fill(0.0f0,number_individuals,free_parameters)
-    genomes = ask(optimizer)
+    genomes = opt.ask()
     for i in 1:number_individuals
         for j in 1:free_parameters
             individuals[i,j] = (genomes[i])[j]
