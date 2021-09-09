@@ -1,5 +1,6 @@
 using BenchmarkTools
 using JSON
+using CUDA
 
 include("optimizers/optimizer.jl")
 include("environments/collect_points_env.jl")
