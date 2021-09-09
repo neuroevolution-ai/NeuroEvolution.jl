@@ -18,7 +18,7 @@ class OptimizerCmaEsDeap(IOptimizer):
     def __init__(self, individual_size: int, configuration: dict):
 
         self.individual_size = individual_size
-        config = {"type": "CMA-ES-Deap", "population_size" : 112, "sigma" : 1.0}   #OptimizerCmaEsDeapCfg(**configuration)
+        config = {"type": "CMA-ES-Deap", "population_size" : configuration["population_size"], "sigma" : configuration["sigma"]}
 
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
         creator.create("Individual", list, typecode='b', fitness=creator.FitnessMax)
