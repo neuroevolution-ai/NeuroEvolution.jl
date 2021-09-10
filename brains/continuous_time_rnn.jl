@@ -1,9 +1,12 @@
 using CUDA
 using Adapt
 
+@enum Dif_equation original separated
+
 struct CTRNN_Cfg
     delta_t::Float32
     number_neurons::Int64
+    differential_equation::Dif_equation
     clipping_range_min::Float32
     clipping_range_max::Float32
     alpha::Float32
@@ -11,10 +14,18 @@ end
 function Adapt.adapt_structure(to, ctrnn::CTRNN_Cfg)
     delta_t = Adapt.adapt_structure(to, ctrnn.delta_t)
     number_neurons = Adapt.adapt_structure(to, ctrnn.number_neurons)
+    differential_equation = ctrnn.differential_equation
     clipping_range_min = Adapt.adapt_structure(to, ctrnn.clipping_range_min)
     clipping_range_max = Adapt.adapt_structure(to, ctrnn.clipping_range_max)
     alpha = Adapt.adapt_structure(to, ctrnn.alpha)
-    CTRNN_Cfg(delta_t, number_neurons, clipping_range_min, clipping_range_max, alpha)
+    CTRNN_Cfg(
+        delta_t,
+        number_neurons,
+        differential_equation,
+        clipping_range_min,
+        clipping_range_max,
+        alpha,
+    )
 end
 
 
@@ -54,21 +65,35 @@ function brain_step(threadID, temp_V, V, W, T, x, input, action, brain_cfg::CTRN
     input_size = size(V, 2)
     output_size = size(T, 1)
 
-    #V * input multiplication
-    V_value = 0.0f0
-    for i = 1:input_size
-        @inbounds V_value += V[threadID, i] * input[i]
-    end
-    #
-    @inbounds temp_V[threadID] = tanh(x[threadID] + V_value)
+    if brain_cfg.differential_equation == original
+        #V * input multiplication
+        V_value = 0.0f0
+        for i = 1:input_size
+            @inbounds V_value += V[threadID, i] * input[i]
+        end
+        #
+        @inbounds temp_V[threadID] = tanh(x[threadID] + V_value)
 
-    #W * result of Vmult
-    W_value = 0.0f0
-    for i = 1:brain_cfg.number_neurons
-        @inbounds W_value = W[threadID, i] * temp_V[i] + W_value
+        #W * result of Vmult
+        W_value = 0.0f0
+        for i = 1:brain_cfg.number_neurons
+            @inbounds W_value += W[threadID, i] * temp_V[i]
+        end
+        #
+        dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
+    elseif brain_cfg.differential_equation == separated
+        V_value = 0.0f0
+        for i = 1:input_size
+            @inbounds V_value += V[threadID, i] * input[i]
+        end
+        @inbounds temp_V[threadID] = V_value
+        W_value = 0.0f0
+        for i = 1:brain_cfg.number_neurons
+            @inbounds W_value += W[threadID, i] * tanh(x[i])
+        end
+        temp_V[threadID] += W_value
+        dx_dt = (-brain_cfg.alpha * x[threadID]) + temp_V[threadID]
     end
-    #
-    dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
     @inbounds x[threadID] += (brain_cfg.delta_t * dx_dt)
     @inbounds x[threadID] =
         clamp(x[threadID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)

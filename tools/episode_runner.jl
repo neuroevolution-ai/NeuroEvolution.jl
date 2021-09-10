@@ -16,7 +16,6 @@ function kernel_eval_fitness(
     tx = threadIdx().x
     fitness_total = 0
 
-
     V = @cuDynamicSharedMem(
         Float32,
         (brain_cfg.number_neurons, environment_cfg.number_inputs)

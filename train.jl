@@ -13,6 +13,7 @@ include("optimizers/optimizer.jl")
 include("tools/episode_runner.jl")
 include("tools/write_results.jl")
 
+
 function main()
     configuration = JSON.parsefile(
         "configurations/CMA_ES_Deap_CTRNN_Dense.json",
@@ -29,6 +30,7 @@ function main()
     brain_cfg = CTRNN_Cfg(
         brain["delta_t"],
         brain["number_neurons"],
+        separated,
         brain["clipping_range_min"],
         brain["clipping_range_max"],
         brain["alpha"],
