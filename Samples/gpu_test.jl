@@ -51,7 +51,7 @@ function maze_kernel(maze,offset,maze_columns,maze_rows)
 
         if cell_y_coordinate-1 >= 1
             for i in 1:4
-                if maze[cell_y_coordinate-1,cell_x_coordinate,i] == 0
+                if maze[cell_y_coordinate-1,cell_x_coordinate,i,blockIdx().x] == 0
                     break
                 end
                 if i == 4
@@ -61,7 +61,7 @@ function maze_kernel(maze,offset,maze_columns,maze_rows)
         end
         if cell_x_coordinate+1 <= maze_columns
             for i in 1:4
-                if maze[cell_y_coordinate,cell_x_coordinate+1,i] == 0
+                if maze[cell_y_coordinate,cell_x_coordinate+1,i,blockIdx().x] == 0
                     break
                 end
                 if i == 4
@@ -71,7 +71,7 @@ function maze_kernel(maze,offset,maze_columns,maze_rows)
         end
         if cell_y_coordinate+1 <= maze_rows
             for i in 1:4
-                if maze[cell_y_coordinate+1,cell_x_coordinate,i] == 0
+                if maze[cell_y_coordinate+1,cell_x_coordinate,i,blockIdx().x] == 0
                     break
                 end
                 if i == 4
@@ -81,7 +81,7 @@ function maze_kernel(maze,offset,maze_columns,maze_rows)
         end
         if cell_x_coordinate-1 >= 1
             for i in 1:4
-                if maze[cell_y_coordinate,cell_x_coordinate-1,i] == 0
+                if maze[cell_y_coordinate,cell_x_coordinate-1,i,blockIdx().x] == 0
                     break
                 end
                 if i == 4
@@ -121,20 +121,20 @@ function maze_kernel(maze,offset,maze_columns,maze_rows)
             end
         end
         if move_y_coordinate == -1 
-            maze[cell_y_coordinate,cell_x_coordinate,1] = 0
-            maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,3] = 0
+            maze[cell_y_coordinate,cell_x_coordinate,1,blockIdx().x] = 0
+            maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,3,blockIdx().x] = 0
         end
         if move_x_coordinate == 1 
-            maze[cell_y_coordinate,cell_x_coordinate,2] = 0
-            maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,4] = 0
+            maze[cell_y_coordinate,cell_x_coordinate,2,blockIdx().x] = 0
+            maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,4,blockIdx().x] = 0
         end
         if move_y_coordinate == 1 
-            maze[cell_y_coordinate,cell_x_coordinate,3] = 0
-            maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,1] = 0
+            maze[cell_y_coordinate,cell_x_coordinate,3,blockIdx().x] = 0
+            maze[cell_y_coordinate+move_y_coordinate,cell_x_coordinate,1,blockIdx().x] = 0
         end
         if move_x_coordinate == -1 
-            maze[cell_y_coordinate,cell_x_coordinate,4] = 0
-            maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,2] = 0
+            maze[cell_y_coordinate,cell_x_coordinate,4,blockIdx().x] = 0
+            maze[cell_y_coordinate,cell_x_coordinate+move_x_coordinate,2,blockIdx().x] = 0
         end
 
         #step5: add origin cell to stack
@@ -217,9 +217,11 @@ end
 
 maze_columns = 5
 maze_rows = 5
-maze = fill(0,(maze_rows,maze_columns,4))
+number_individuals = 10
+maze = fill(0,(maze_rows,maze_columns,4,number_individuals))
+
 
 maze_gpu = CuArray(maze)
-@cuda shmem=2*maze_columns*maze_rows+4 maze_kernel(maze_gpu,0,maze_columns,maze_rows)
+@cuda blocks=number_individuals shmem=2*maze_columns*maze_rows+4 maze_kernel(maze_gpu,0,maze_columns,maze_rows)
 CUDA.synchronize()
-Array(maze_gpu)
+display(Array(maze_gpu))

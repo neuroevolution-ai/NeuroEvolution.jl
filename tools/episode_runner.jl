@@ -83,7 +83,7 @@ function kernel_eval_fitness(
         sizeof(x) +
         sizeof(action) +
         sizeof(maze)
-    )  # Format [agent_x_coordinate,agent_y_coordinate,positive_point_x_coordinate,positive_point_y_coordinate,negative_point_x_coordinate,negative_point_y_coordinate]
+    )
     offset =
         sizeof(V) +
         sizeof(W) +
