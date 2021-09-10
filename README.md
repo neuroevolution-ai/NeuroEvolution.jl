@@ -14,4 +14,10 @@ Conda.pip_interop(true)
 Conda.pip("install","git+https://github.com/neuroevolution-ai/deap.git@eigenvalues-on-gpu")
 ```
 
+As an alternative, install via pip:
+
+```bash
+pip install git+https://github.com/neuroevolution-ai/deap@eigenvalues-on-gpu
+```
+
 3. Execute the train.jl to start the training.
