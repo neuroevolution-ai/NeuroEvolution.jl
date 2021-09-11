@@ -1,6 +1,6 @@
 # NeuroEvolution.jl
 
-*Neuroevolution on the GPU using the Julia programming language*
+*Deep Neuroevolution on the GPU implemented in Julia*
 
 ## Quick start
 
