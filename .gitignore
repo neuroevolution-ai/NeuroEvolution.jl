@@ -26,7 +26,7 @@ Manifest.toml
 ### Python part starts here
 
 # Byte-compiled / optimized / DLL files
-__pycache__/
+*.__pycache__/
 *.py[cod]
 *$py.class
 
