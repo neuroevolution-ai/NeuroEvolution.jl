@@ -31,27 +31,53 @@ end
 
 
 struct TestStruct{A}
+    z::A
     x::A
     y::A
 end
 Adapt.Adapt.@adapt_structure TestStruct
-function create_struct(a,b)
-    test_struct = TestStruct(a,b)
-    return test_struct
+
+struct struct2{A}
+    b::Bool
+    a::A
 end
+Adapt.Adapt.@adapt_structure struct2
 
-function kernel(test)
-
+function kernel(test::struct2)
+    @cushow(test.b)
+    @cushow(test.a[1].x)
     return
 end
 
-a = TestStruct(3,4)
-array1 = CUDA.fill(1,5)
-array2 = CUDA.fill(2,5)
-b = TestStruct(array1,array2)
+struct pt
+    x::Float64
+    y::Float64
+end
 
-s = StructArray{TestStruct}(undef,2)
-s[1] = a
-s[2] = b
-@cuda kernel(b)
-CUDA.synchronize()
+function initpt!(a)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = blockDim().x * gridDim().x
+    for i in index:stride:length(a)
+        a[i] = pt(1.0, 2.0)
+    end
+    return nothing
+end
+
+ndata = 10240
+thdx  = 256
+numblocks = ceil(Int, ndata/thdx)
+
+println("Starting TEST: Memory allocation and transfer")
+#test = StructArray{TestStruct}((1,2))
+#display(test)
+cua1 = StructArray{TestStruct}((zeros(1),ones(1), ones(1)))
+#display(cua1)
+#test2 = replace_storage(CuArray,test)
+#display(test2)
+#@cuda kernel(test2)
+s1 = struct2(false,cua1)
+
+cua2 = replace_storage(CuArray, cua1)
+s2 = struct2(false,cua2)
+display(s2)
+@cuda kernel(s2)

@@ -166,17 +166,17 @@ function main()
     end
     result_directory = "Simulation_results/" * Dates.format(a, form)
 
-    #mkdir(result_directory)
-    #write_results_to_textfile(
-    #    result_directory * "/Log.txt",
-    #    configuration,
-    #    log,
-    #    number_inputs,
-    #    number_outputs,
-    #    number_individuals,
-    #    free_parameters,
-    #    now() - start_time_training,
-    #)
+    mkdir(result_directory)
+    write_results_to_textfile(
+        result_directory * "/Log.txt",
+        configuration,
+        log,
+        number_inputs,
+        number_outputs,
+        number_individuals,
+        free_parameters,
+        now() - start_time_training,
+    )
 end
 
 main()
