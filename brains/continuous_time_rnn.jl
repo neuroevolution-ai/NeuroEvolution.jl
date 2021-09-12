@@ -16,24 +16,6 @@ struct CTRNN_Cfg{A,B}
     x::B
 end
 Adapt.@adapt_structure CTRNN_Cfg
-#=
-function Adapt.adapt_structure(to, ctrnn::CTRNN_Cfg)
-    delta_t = Adapt.adapt_structure(to, ctrnn.delta_t)
-    number_neurons = Adapt.adapt_structure(to, ctrnn.number_neurons)
-    differential_equation = ctrnn.differential_equation
-    clipping_range_min = Adapt.adapt_structure(to, ctrnn.clipping_range_min)
-    clipping_range_max = Adapt.adapt_structure(to, ctrnn.clipping_range_max)
-    alpha = Adapt.adapt_structure(to, ctrnn.alpha)
-    CTRNN_Cfg(
-        delta_t,
-        number_neurons,
-        differential_equation,
-        clipping_range_min,
-        clipping_range_max,
-        alpha,
-    )
-end
-=#
 
 function get_memory_requirements(number_inputs, number_outputs, brain_cfg::CTRNN_Cfg)
     return sizeof(Float32) * (
