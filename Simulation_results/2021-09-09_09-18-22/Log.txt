@@ -1,0 +1,45 @@
+number_generations: 5
+number_validation_runs: 100
+number_rounds: 20
+maximum_env_seed: 100000
+environment
+	type: CollectPoints
+	maze_columns: 5
+	maze_rows: 5
+	maze_cell_size: 80
+	agent_radius: 12
+	point_radius: 8
+	agent_movement_range: 10.0
+	use_sensors: true
+	reward_per_collected_positive_point: 500.0
+	reward_per_collected_negative_point: -700.0
+	number_time_steps: 1000
+brain
+	type: CTRNN
+	delta_t: 0.05
+	number_neurons: 50
+	differential_equation: original
+	clipping_range_min: -1.0
+	clipping_range_max: 1.0
+	set_principle_diagonal_elements_of_W_negative: true
+	alpha: 0.0
+optimizer
+	type: CMA-ES-Deap
+	population_size: 112
+	sigma: 1.0
+
+Genome Size: 112
+Free Parameters: 3100
+Inputs: 10
+Outputs: 2
+
+------------------------------------------------------------------------------------------
+gen     min           mean          max           best          elapsed time (s)
+------------------------------------------------------------------------------------------
+1       -175.0f0      -20.669643f0  155.0f0       -23.0f0       16 seconds635 milliseconds
+2       -280.0f0      -23.660715f0  165.0f0       1.0f0         1 second884 milliseconds
+3       -175.0f0      -11.339286f0  145.0f0       14.0f0        1 second848 milliseconds
+4       -220.0f0      -18.705357f0  100.0f0       14.0f0        1 second812 milliseconds
+5       -140.0f0      -19.955357f0  100.0f0       14.0f0        1 second821 milliseconds
+
+Elapsed time for training: 25 seconds179 milliseconds
