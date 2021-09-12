@@ -1,6 +1,7 @@
 using CUDA
 using Adapt
 using JSON
+using StructArrays
 
 
 struct Interpolate{CuArray}
@@ -29,30 +30,27 @@ end
 #@cuda kernel(itp)
 
 
-struct TestStruct
+struct TestStruct{A}
     x::Int
-    y::Int
+    y::A
 end
-function Adapt.adapt_structure(to, test::TestStruct)
-    x = Adapt.adapt_structure(to, test.x)
-    y = Adapt.adapt_structure(to, test.y)
-    TestStruct(x, y)
-end
-
+Adapt.Adapt.@adapt_structure TestStruct
 function create_struct(a,b)
     test_struct = TestStruct(a,b)
     return test_struct
 end
 
-function kernel()
-    a = 10
-    b = 20
-    test = create_struct(a,b)
-    @cuprintln(test.a)
-    @cuprintln(test.b)
+function kernel(test)
+    @cushow(test.y[1])
+    test.y[1] = 2
+    @cushow(test.y[1])
+    
     return
 end
 
-@device_code_warntype @cuda kernel()
-
+x = 5
+y = CUDA.fill(1,5)
+test = TestStruct(x,y)
+@cuda kernel(test)
+CUDA.synchronize()
 

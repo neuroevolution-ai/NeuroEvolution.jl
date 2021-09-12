@@ -1,9 +1,7 @@
 using JSON
 using Random
 using CUDA
-using BenchmarkTools
 using Statistics
-using Logging
 using Dates
 using DataStructures
 
@@ -27,30 +25,41 @@ function main()
     environment = configuration["environment"]
     brain = configuration["brain"]
     optimizer = configuration["optimizer"]
-    brain_cfg = CTRNN_Cfg(
-        brain["delta_t"],
-        brain["number_neurons"],
-        separated,
-        brain["clipping_range_min"],
-        brain["clipping_range_max"],
-        brain["alpha"],
-    )
     number_inputs = get_number_inputs()
     number_outputs = get_number_outputs()
+
+    number_individuals = optimizer["population_size"]
+    #env_config init
+    mazes = CUDA.fill(1,(environment["maze_rows"],environment["maze_columns"],4,number_individuals))
+    agents = CUDA.fill(0,(6,number_individuals))
     environment_cfg = Collect_Points_Env_Cfg(
         environment["maze_columns"],
         environment["maze_rows"],
-        environment["maze_cell_size"],
+        convert(Int32,environment["maze_cell_size"]),
         environment["agent_radius"],
-        environment["point_radius"],
-        environment["agent_movement_range"],
-        environment["reward_per_collected_positive_point"],
-        environment["reward_per_collected_negative_point"],
-        environment["number_time_steps"],
+        convert(Int32,environment["point_radius"]),
+        convert(Float32,environment["agent_movement_range"]),
+        convert(Float32,environment["reward_per_collected_positive_point"]),
+        convert(Float32,environment["reward_per_collected_negative_point"]),
+        convert(Int32,environment["number_time_steps"]),
         number_inputs,
-        number_outputs,
+        number_outputs,mazes,agents
     )
-    number_individuals = optimizer["population_size"]
+    #
+    #brain_config init
+    V = CUDA.fill(0.0f0,(brain["number_neurons"],number_inputs,number_individuals))
+    W = CUDA.fill(0.0f0,(brain["number_neurons"],brain["number_neurons"],number_individuals))
+    T = CUDA.fill(0.0f0,(number_inputs,brain["number_neurons"],number_individuals))
+    x = CUDA.fill(0.0f0,(brain["number_neurons"],number_individuals))
+    brain_cfg = CTRNN_Cfg(
+        convert(Float32,brain["delta_t"]),
+        brain["number_neurons"],
+        separated,
+        convert(Float32,brain["clipping_range_min"]),
+        convert(Float32,brain["clipping_range_max"]),
+        convert(Float32,brain["alpha"]),V,W,T,x
+    )
+    #
     brain_state = generate_brain_state(number_inputs, number_outputs, brain)
     free_parameters = get_individual_size(brain_state)
 
@@ -157,17 +166,17 @@ function main()
     end
     result_directory = "Simulation_results/" * Dates.format(a, form)
 
-    mkdir(result_directory)
-    write_results_to_textfile(
-        result_directory * "/Log.txt",
-        configuration,
-        log,
-        number_inputs,
-        number_outputs,
-        number_individuals,
-        free_parameters,
-        now() - start_time_training,
-    )
+    #mkdir(result_directory)
+    #write_results_to_textfile(
+    #    result_directory * "/Log.txt",
+    #    configuration,
+    #    log,
+    #    number_inputs,
+    #    number_outputs,
+    #    number_individuals,
+    #    free_parameters,
+    #    now() - start_time_training,
+    #)
 end
 
 main()
