@@ -3,6 +3,7 @@ using Adapt
 using StructArrays
 
 include("../ui/Button.jl")
+include("../ui/Window.jl")
 
 struct Jadx_env{A,B,C}
     __all_buttons::A
@@ -19,10 +20,22 @@ end
 Adapt.@adapt_structure Jadx_env
 
 #
-function initialize(environment_configuration)
-    __all_buttons
+function initialize()#environment configuration
+    __all_buttons = StructArray{Button}(undef,100)# length of number of possible buttons
+    all_buttons = replace_storage(CuArray,__all_buttons)
+    main_window = CUDA.fill(0.0f0,(100,100)) #(x,y) = dimensionen des main_windows
+    __windows = StructArray{Window}(undef,100) # length of number of possible windows
+    windows = replace_storage(CuArray,__windows)
+    __frame_buffer = similar(main_window)
+    __width = convert(Int32,100)
+    __height = convert(Int32,100)
+    __should_restack = false
+    __last_clicked_index = convert(Int32,0)
+    __windows_to_be_removed = StructArray{Window}(undef,100)# length of number of possible windows
+    windows_to_be_removed = replace_storage(CuArray,__windows_to_be_removed)
 
-    Jadx_env()
+
+    Jadx_env(all_buttons,main_window,windows,__frame_buffer,__width,__height,__should_restack,__last_clicked_index,windows_to_be_removed)
 end
 
 #prepare the Environment inside the Kernel for each round
@@ -37,3 +50,4 @@ end
 function __init_components()
 
 end
+

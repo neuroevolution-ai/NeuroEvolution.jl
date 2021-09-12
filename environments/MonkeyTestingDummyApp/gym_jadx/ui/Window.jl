@@ -2,7 +2,7 @@
 
 
 
-struct Button{A,B}
+struct Window{A,B}
     __relative_coordinates::A
     __width::Int32
     __height::Int32
@@ -15,4 +15,4 @@ struct Button{A,B}
     __resettable::Bool
 end
 
-Adapt.@adapt_structure Button
+Adapt.@adapt_structure Window
