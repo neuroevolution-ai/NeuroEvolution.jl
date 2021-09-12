@@ -12,7 +12,6 @@ function kernel_eval_fitness(
     brain_cfg::CTRNN_Cfg,
     environment_cfg::Collect_Points_Env_Cfg,
 )
-
     tx = threadIdx().x
     fitness_total = 0
 
@@ -39,9 +38,10 @@ function kernel_eval_fitness(
 
     sync_threads()
 
-    brain_initialize(tx, blockIdx().x, V, W, T, individuals)
+    brain_initialize(tx, blockIdx().x, V, W, T, individuals,brain_cfg)
 
     sync_threads()
+
     x = @cuDynamicSharedMem(
         Float32,
         brain_cfg.number_neurons,
@@ -133,7 +133,7 @@ function kernel_eval_fitness(
         #Loop through Timesteps
         #################################################
         for index = 1:environment_cfg.number_time_steps
-            brain_step(tx, temp_V, V, W, T, x, input, action, brain_cfg)
+            brain_step(tx,blockIdx().x,temp_V, V, W, T, x, input, action, brain_cfg)
             sync_threads()
             if tx == 1
                 rew =

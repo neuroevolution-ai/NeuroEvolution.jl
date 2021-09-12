@@ -35,7 +35,7 @@ end
 	clipping_range = 1.0
 	alpha = 0.0
 	action = CUDA.fill(0.0f0,output_size)
-	brain_cfg = CTRNN_Cfg(delta_t,number_neurons,-clipping_range,clipping_range,alpha)
+	brain_cfg = CTRNN_Cfg(delta_t,number_neurons,original,-clipping_range,clipping_range,alpha)
 	@cuda threads=50 kernel_test_brain_step(CuArray(V),CuArray(W),CuArray(T),CuArray(x),temp_V,CuArray(input),action,brain_cfg)
 	temp = x + delta_t.*((-alpha.*x)+W*map(tanh,(x+(V*input))))
 	temp = clamp.(temp,-clipping_range,clipping_range)

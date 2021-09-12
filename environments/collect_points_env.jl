@@ -1,7 +1,7 @@
 using Adapt
 using Random
 
-struct Collect_Points_Env_Cfg
+struct Collect_Points_Env_Cfg{A,B}
     maze_columns::Int64
     maze_rows::Int64
     maze_cell_size::Int32
@@ -13,36 +13,12 @@ struct Collect_Points_Env_Cfg
     number_time_steps::Int32
     number_inputs::Int64
     number_outputs::Int64
+    mazes::A
+    agents::B
 end
-function Adapt.adapt_structure(to, env::Collect_Points_Env_Cfg)
-    maze_columns = Adapt.adapt_structure(to, env.maze_columns)
-    maze_rows = Adapt.adapt_structure(to, env.maze_rows)
-    maze_cell_size = Adapt.adapt_structure(to, env.maze_cell_size)
-    agent_radius = Adapt.adapt_structure(to, env.agent_radius)
-    point_radius = Adapt.adapt_structure(to, env.point_radius)
-    agent_movement_range = Adapt.adapt_structure(to, env.agent_movement_range)
-    reward_per_collected_positive_point =
-        Adapt.adapt_structure(to, env.reward_per_collected_positive_point)
-    reward_per_collected_negative_point =
-        Adapt.adapt_structure(to, env.reward_per_collected_negative_point)
-    number_time_steps = Adapt.adapt_structure(to, env.number_time_steps)
-    number_inputs = Adapt.adapt_structure(to, env.number_inputs)
-    number_outputs = Adapt.adapt_structure(to, env.number_outputs)
 
-    Collect_Points_Env_Cfg(
-        maze_columns,
-        maze_rows,
-        maze_cell_size,
-        agent_radius,
-        point_radius,
-        agent_movement_range,
-        reward_per_collected_positive_point,
-        reward_per_collected_negative_point,
-        number_time_steps,
-        number_inputs,
-        number_outputs,
-    )
-end
+Adapt.@adapt_structure Collect_Points_Env_Cfg
+
 function place_agent_randomly_in_maze(environment_cfg)
     x_coordinate = convert(
         Int32,
