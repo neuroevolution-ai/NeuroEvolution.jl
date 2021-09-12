@@ -1,1 +1,23 @@
 # NeuroEvolution.jl
+
+*Deep Neuroevolution on the GPU implemented in Julia*
+
+## Quick start
+
+1. The NeuroEvolution.jl framework uses the CUDA.jl package, install this package first and make sure it is working: https://cuda.juliagpu.org/stable/
+
+2. We use PyCall to integrate the covariance matrix adaptation evolution strategy (CMA-ES) from the deap package. Further, we modified the original deap package to use the GPU instead of the CPU to speed up the calculation of the eigenvalues in order to update the covariance matrix. To install our deap version, execute the following in the Julia REPL:
+
+```bash
+using Conda
+Conda.pip_interop(true)
+Conda.pip("install","git+https://github.com/neuroevolution-ai/deap.git@eigenvalues-on-gpu")
+```
+
+As an alternative, install via pip:
+
+```bash
+pip install git+https://github.com/neuroevolution-ai/deap@eigenvalues-on-gpu
+```
+
+3. Execute the train.jl to start the training.
