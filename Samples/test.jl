@@ -31,7 +31,7 @@ end
 
 
 struct TestStruct{A}
-    x::Int
+    x::A
     y::A
 end
 Adapt.Adapt.@adapt_structure TestStruct
@@ -41,16 +41,17 @@ function create_struct(a,b)
 end
 
 function kernel(test)
-    @cushow(test.y[1])
-    test.y[1] = 2
-    @cushow(test.y[1])
-    
+
     return
 end
 
-x = 5
-y = CUDA.fill(1,5)
-test = TestStruct(x,y)
-@cuda kernel(test)
-CUDA.synchronize()
+a = TestStruct(3,4)
+array1 = CUDA.fill(1,5)
+array2 = CUDA.fill(2,5)
+b = TestStruct(array1,array2)
 
+s = StructArray{TestStruct}(undef,2)
+s[1] = a
+s[2] = b
+@cuda kernel(b)
+CUDA.synchronize()
