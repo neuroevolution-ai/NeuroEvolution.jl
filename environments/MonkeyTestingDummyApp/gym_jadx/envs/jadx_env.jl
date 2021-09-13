@@ -51,3 +51,18 @@ function __init_components()
 
 end
 
+
+function init_main_window(test)
+
+    return
+end
+
+clicked = CUDA.fill(0.5f0,(10,10,3))
+unclicked = CUDA.fill(1.0f0,(10,10,3))
+parent = CUDA.fill(0.0f0,(10,10,3))
+
+button = Button(convert(Int32,1),convert(Int32,1),convert(Int32,10),convert(Int32,10),clicked,unclicked,convert(Int32,2),true,false,false)
+window = Window(convert(Int32,1),convert(Int32,1),convert(Int32,1),convert(Int32,1),button,button,false)
+
+#@cuda init_main_window(window)
+
