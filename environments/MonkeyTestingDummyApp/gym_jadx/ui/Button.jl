@@ -88,7 +88,7 @@ function get_button(name::Enum,buttons::All_Buttons)
 end
 
 function draw_self(button::Button,parent_matrix)
-    if !(button.status[1])
+    if !(button.status[1,blockIdx().x])
         kernel_blit_image_inplace(threadIdx().x,blockIdx().x,parent_matrix,button.matrix_unclicked,button.x_Coord,button.y_Coord)
     else 
         kernel_blit_image_inplace(threadIdx().x,blockIdx().x,parent_matrix,button.matrix_clicked,button.x_Coord,button.y_Coord)
@@ -110,7 +110,7 @@ function listen(func::On_click_listeners)
 end
 
 function select_matrix(button)
-    if button.status[1]
+    if button.status[1,blockIdx().x]
         return button.matrix_clicked
     else
         return button.matrix_unclicked
@@ -121,21 +121,21 @@ function click(x,y,button,parents_x,parents_y)
     
     if includes_point(x,y,(button.x_Coord+parents_x),(button.y_Coord+parents_y),button.width,button.height)
         if threadIdx().x == 1
-            button.status[1] = !(button.status[1])
+            button.status[1,blockIdx().x] = !(button.status[1,blockIdx().x])
         end
         sync_threads()
-        if button.status[2]
+        if button.status[2,blockIdx().x]
             reward = 0
         else
-            button.status[2] = true
+            button.status[2,blockIdx().x] = true
             reward = button.reward
         end
         listen(button.on_click_listener)
-        return reward,true,select_matrix(button),button.x_Coord,button.y_Coord
+        return reward,true,button.x_Coord,button.y_Coord
         
     end
 
-    return 0,false,select_matrix(button),0,0
+    return 0,false,0,0
 end
 #=
 struct Button{A}

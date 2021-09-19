@@ -47,14 +47,19 @@ function click(x,y,window::Window,all_buttons::All_Buttons)
         for button in window.buttons
             
             current_button = get_button(button,all_buttons)
-            #@cushow(current_button.x_Coord,current_button.y_Coord)
-            reward,click_on_child,matrix,coords_x,coords_y = click(x,y,current_button,window.x_Coord,window.y_Coord)
+            reward,click_on_child,coords_x,coords_y = click(x,y,current_button,window.x_Coord,window.y_Coord)
+            sync_threads()
             if click_on_child
-                return reward,click_on_window,matrix,(coords_x+window.x_Coord),(coords_y+window.y_Coord)
+                if current_button.status[1,blockIdx().x]
+                    #kernel_blit_image_inplace(threadIdx().x,blockIdx().x,window.current_matrix,current_button.matrix_clicked,coords_x,coords_y) 
+                else
+                    #kernel_blit_image_inplace(threadIdx().x,blockIdx().x,window.current_matrix,current_button.matrix_unclicked,coords_x,coords_y) 
+                end
+                return reward,click_on_window,window.x_Coord,window.y_Coord
             end
         end
     end
-    return 0,false,window.current_matrix,0,0
+    return 0,false,0,0
 end
 
 

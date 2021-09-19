@@ -2,6 +2,8 @@ using CUDA
 using Adapt
 using StructArrays
 using ImageView, Images
+using Random
+using Test
 include("../util/Matrix_utils.jl")
 include("../util/Image_Container.jl")
 include("../util/Enum_Collection.jl")
@@ -24,9 +26,6 @@ function get_window(name::Enum,windows::All_Windows)#::Window
     end
 end
 
-function step(x,y,env::Jadx_Environment)
-
-end
 
 function init_components()
 end
@@ -69,90 +68,90 @@ function kernel(env::Jadx_Environment)
     return
 end
 
-function init_app_close_button()
+function init_app_close_button(number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("close_window_button_large_unclicked.png"))
-    return Button(380,1,size(matrix_unclicked,3),size(matrix_unclicked,2),2,similar(matrix_unclicked),matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(380,1,size(matrix_unclicked,3),size(matrix_unclicked,2),2,similar(matrix_unclicked),matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
 
-function init_dropdown_button_datei(position)
+function init_dropdown_button_datei(position,number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("drpdwn_datei_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("drpdwn_datei_clicked.png"))
-    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
-function init_dropdown_button_anzeigen(position)
+function init_dropdown_button_anzeigen(position,number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("drpdwn_anzeigen_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("drpdwn_anzeigen.png"))
-    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
-function init_dropdown_button_navigation(position)
+function init_dropdown_button_navigation(position,number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("drpdwn_navigation_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("drpdwn_navigation_clicked.png"))
-    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
-function init_dropdown_button_tools(position)
+function init_dropdown_button_tools(position,number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("drpdwn_tools_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("drpdwn_tools_clicked.png"))
-    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
-function init_dropdown_button_hilfe(position)
+function init_dropdown_button_hilfe(position,number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("drpdwn_hilfe_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("drpdwn_hilfe_clicked.png"))
-    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    return Button(position,12,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
 
-function init_main_window_small_buttons()
+function init_main_window_small_buttons(number_individuals)
     position=1
     matrix_unclicked = CuArray(get_array_of_image("small_button_1_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_1_clicked.png"))
-    small_button_1 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_1 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_2_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_2_clicked.png"))
-    small_button_2 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_2 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_3_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_3_clicked.png"))
-    small_button_3 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_3 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_4_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_4_clicked.png"))
-    small_button_4 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_4 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_5_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_5_clicked.png"))
-    small_button_5 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_5 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_6_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_6_clicked.png"))
-    small_button_6 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_6 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_7_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_7_clicked.png"))
-    small_button_7 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_7 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_8_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_8_clicked.png"))
-    small_button_8 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_8 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_9_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_9_clicked.png"))
-    small_button_9 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_9 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_10_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_10_clicked.png"))
-    small_button_10 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_10 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_11_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_11_clicked.png"))
-    small_button_11 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_11 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_12_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_12_clicked.png"))
-    small_button_12 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_12 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
     position += 7
     matrix_unclicked = CuArray(get_array_of_image("small_button_13_unclicked.png"))
     matrix_clicked = CuArray(get_array_of_image("small_button_13_clicked.png"))
-    small_button_13 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,2),true,placeholder)
+    small_button_13 = Button(position,22,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_clicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 
     return begin
         small_button_1,
@@ -171,18 +170,18 @@ function init_main_window_small_buttons()
     end
 end
 
-function init_all_buttons()
-    close_button = init_app_close_button()
+function init_all_buttons(number_individuals)
+    close_button = init_app_close_button(number_individuals)
     position = 1
-    button_datei = init_dropdown_button_datei(position)
+    button_datei = init_dropdown_button_datei(position,number_individuals)
     position += button_datei.width
-    button_anzeigen = init_dropdown_button_anzeigen(position)
+    button_anzeigen = init_dropdown_button_anzeigen(position,number_individuals)
     position += button_anzeigen.width
-    button_navigation = init_dropdown_button_navigation(position)
+    button_navigation = init_dropdown_button_navigation(position,number_individuals)
     position += button_navigation.width
-    button_tools = init_dropdown_button_tools(position)
+    button_tools = init_dropdown_button_tools(position,number_individuals)
     position += button_tools.width
-    button_hilfe = init_dropdown_button_hilfe(position)
+    button_hilfe = init_dropdown_button_hilfe(position,number_individuals)
     begin
         small_button_1,
         small_button_2,
@@ -196,7 +195,7 @@ function init_all_buttons()
         small_button_10,
         small_button_11,
         small_button_12,
-        small_button_13 = init_main_window_small_buttons()
+        small_button_13 = init_main_window_small_buttons(number_individuals)
     end
     return All_Buttons(
         close_button,
@@ -257,7 +256,7 @@ end
 
 function initialize()
 
-    all_buttons = init_all_buttons()
+    all_buttons = init_all_buttons(number_individuals)
     #init All Buttons
 
     all_windows = init_all_windows()
@@ -281,7 +280,7 @@ imshow(colorview(RGB,Array(env.frame_buffer)))
 function initialize2()
     number_individuals = 10
 
-    all_buttons = init_all_buttons()
+    all_buttons = init_all_buttons(number_individuals)
     #init All Buttons
 
     all_windows = init_all_windows(number_individuals)
@@ -291,15 +290,9 @@ function initialize2()
     frame_buffer = CuArray{N0f8}(undef,(size(all_windows.main_window.matrix_self,1),size(all_windows.main_window.matrix_self,2),size(all_windows.main_window.matrix_self,3),number_individuals))
     return Jadx_Environment(all_windows,all_buttons,windows,frame_buffer)
 end
-env = initialize2()
 #display(env)
 
-
-function kernel3(env::Jadx_Environment)
-    kernel_blit_image_inplace(threadIdx().x,blockIdx().x,env.frame_buffer,env.all_windows.main_window.matrix_self,1,1)
-    #reset()
-
-    #fill
+function reset2(env::Jadx_Environment)
     for i in 1:size(env.windows,1)
         env.windows[i,blockIdx().x] = no_window
     end
@@ -312,13 +305,132 @@ function kernel3(env::Jadx_Environment)
     sync_threads()
     
     kernel_blit_image_inplace(threadIdx().x,blockIdx().x,env.frame_buffer,current_window.current_matrix,current_window.x_Coord,current_window.y_Coord) 
-    
+
+end
+
+function fill_input(dest,src)
+    if threadIdx().x <= size(src,3)
+        for i in 1:size(src,1)
+            for j in 1:size(src,2)
+                dest[i,j,threadIdx().x] = convert(Float32,src[i,j,threadIdx().x,blockIdx().x])
+            end
+        end
+    end
+end
+
+function step(env::Jadx_Environment,action,input)
+    reward = 0
+    number_of_windows_to_be_removed  = 0
+    should_restack = false
+    click_x = clamp(ceil(action[1] * 400),0,400)
+    click_y = clamp(ceil(action[2] * 268),0,268)
+    for i in 1:size(env.windows,1)
+        if env.windows[i,blockIdx().x] ≠ no_window
+            #index = i - windows_to_be_removed
+            #last_clicked_index = size(env.windows,1) - index
+            current_window = get_window(env.windows[i,blockIdx().x],env.all_windows)
+
+            reward,window_includes_point,coords_x,coords_y = click(click_x,click_y,current_window,env.all_buttons)
+            sync_threads()
+            if window_includes_point
+                if !should_restack
+                    draw_self(current_window,env.all_windows,env.all_buttons)
+                    sync_threads()
+                    kernel_blit_image_inplace(threadIdx().x,blockIdx().x,env.frame_buffer,current_window.current_matrix,coords_x,coords_y)
+                end
+                break
+
+            else
+                if current_window.modal
+                    break
+                elseif current_window.autoclose
+                    
+                end
+            end   
+        end
+    end
+    if should_restack
+        #stack_windows
+    end
+    should_restack = false
+    sync_threads()
+    if threadIdx().x <= size(env.frame_buffer,3)
+        for i in 1:size(env.frame_buffer,1)
+            for j in 1:size(env.frame_buffer,2)
+                input[i,j,threadIdx().x,blockIdx().x] = convert(Float32,env.frame_buffer[i,j,threadIdx().x,blockIdx().x])
+            end
+        end
+    end
+    return reward
+end
+
+function kernel3(env::Jadx_Environment,input)
+    action = @cuDynamicSharedMem(Float32,2)
+    fitness_total = 0
+    for round in 1:1
+
+        reset2(env)
+        for i in 1:5
+            if threadIdx().x == 1
+                action[1] = rand(Float32)
+                action[2] = rand(Float32)
+            end
+            sync_threads()
+            reward = step(env,action,input)
+        end
+    end
     return
     
 end
-
-@cuda threads=500 blocks=10 kernel3(env)
+env = initialize2()
+width = env.all_windows.main_window.width
+height = env.all_windows.main_window.height
+input = CUDA.fill(0.0f0,(3,268,400,10))
+@cuda threads=400 blocks=10 shmem=sizeof(Float32)*2 kernel3(env,input)
 CUDA.synchronize()
+#display(input)
 #display(env.all_windows.main_window)
-display(env.windows)
+#display(env.windows)
+
+
+
+#=
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,1])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,2])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,3])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,4])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,5])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,6])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,7])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,8])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,9])))
+imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,10])))
+=#
+
+
+function episode(number_time_steps,number_rounds,environment_cfg::Jadx_Environment)
+    action = @cuDynamicSharedMem(Float32,2)
+    fitness_total = 0
+    #brain_initialize
+    for round in 1:number_rounds
+        fitness_current = 0
+        #reset brain
+        #env_initialize()
+        obs = reset2(environment_cfg)
+        sync_threads()
+        for timestep in 1:number_time_steps
+            #action = brain_step(obs)
+            if threadIdx().x == 1
+                action[1] = rand(Float32)
+                action[2] = rand(Float32)
+                @cuprintln()
+            end
+            sync_threads()
+            obs,reward = env_step(environment_cfg,action)
+        end
+
+    end
+end
+
+
+#@cuda threads=400 blocks=5 shmem=sizeof(Float32)*2 episode(1000,1,env)

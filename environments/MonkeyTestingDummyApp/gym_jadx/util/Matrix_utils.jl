@@ -70,13 +70,13 @@ function __blit_single_channel_inplace(threadID,blockID, dest, src, channel, x, 
 end
 
 
-function kernel_blit_image_inplace(threadID, dest, src, x, y)
+#function kernel_blit_image_inplace(threadID, dest, src, x, y)
 
-    __blit_single_channel_inplace(threadID, dest, src, 1, x, y)          
-    __blit_single_channel_inplace(threadID, dest, src, 2, x, y)
-    __blit_single_channel_inplace(threadID, dest, src, 3, x, y)
-    return
-end
+#    __blit_single_channel_inplace(threadID, dest, src, 1, x, y)          
+#    __blit_single_channel_inplace(threadID, dest, src, 2, x, y)
+#    __blit_single_channel_inplace(threadID, dest, src, 3, x, y)
+#    return
+#end
 function kernel_blit_image_inplace(threadID,blockID, dest, src, x, y)
 
     __blit_single_channel_inplace(threadID, blockID, dest, src, 1, x, y)          
