@@ -1,7 +1,8 @@
 using CUDA
 using Adapt
 using StructArrays
-using ImageView, Images
+using Images
+#using ImageView
 using Random
 using Test
 include("../util/Matrix_utils.jl")
@@ -312,7 +313,19 @@ function fill_input(dest,src)
     if threadIdx().x <= size(src,3)
         for i in 1:size(src,1)
             for j in 1:size(src,2)
-                dest[i,j,threadIdx().x] = convert(Float32,src[i,j,threadIdx().x,blockIdx().x])
+                @inbounds dest[i,j,threadIdx().x] = convert(Float32,src[i,j,threadIdx().x,blockIdx().x])
+            end
+        end
+    end
+end
+
+
+function grayscale(dest,src)
+    if threadIdx().x <= size(src,3)
+        for i in 1:size(src,2)
+            @inbounds dest[i,threadIdx().x,blockIdx().x] = src[1,i,threadIdx().x,blockIdx().x]#*(0.21f0) + convert(Float32,src[2,i,threadIdx().x,blockIdx().x]) *(0.71f0) + convert(Float32,src[3,i,threadIdx().x,blockIdx().x]) * (0.07f0)
+            if blockIdx().x == 1
+            #@cushow(convert(Float32,src[1,i,threadIdx().x,blockIdx().x]))
             end
         end
     end
@@ -354,13 +367,8 @@ function step(env::Jadx_Environment,action,input)
     end
     should_restack = false
     sync_threads()
-    if threadIdx().x <= size(env.frame_buffer,3)
-        for i in 1:size(env.frame_buffer,1)
-            for j in 1:size(env.frame_buffer,2)
-                input[i,j,threadIdx().x,blockIdx().x] = convert(Float32,env.frame_buffer[i,j,threadIdx().x,blockIdx().x])
-            end
-        end
-    end
+    grayscale(input,env.frame_buffer)
+    sync_threads()
     return reward
 end
 
@@ -385,17 +393,19 @@ end
 env = initialize2()
 width = env.all_windows.main_window.width
 height = env.all_windows.main_window.height
-input = CUDA.fill(0.0f0,(3,268,400,10))
+input = CUDA.fill(0.0f0,(268,400,10))
 @cuda threads=400 blocks=10 shmem=sizeof(Float32)*2 kernel3(env,input)
 CUDA.synchronize()
-#display(input)
-#display(env.all_windows.main_window)
-#display(env.windows)
 
+display(Array(input))
+
+#display(env.windows)
+#imshow(colorview(Gray,Array(input[:,:,1])))
 
 
 #=
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,1])))
+
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,2])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,3])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,4])))

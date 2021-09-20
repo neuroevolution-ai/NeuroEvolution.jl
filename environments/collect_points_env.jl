@@ -19,6 +19,8 @@ end
 
 Adapt.@adapt_structure Collect_Points_Env_Cfg
 
+
+
 function place_agent_randomly_in_maze(environment_cfg)
     x_coordinate = convert(
         Int32,

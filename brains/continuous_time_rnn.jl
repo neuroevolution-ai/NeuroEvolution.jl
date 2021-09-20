@@ -17,6 +17,35 @@ struct CTRNN_Cfg{A,B}
 end
 Adapt.@adapt_structure CTRNN_Cfg
 
+
+function tensordot(input,x,y,kernel,kernel_size)
+    dotproduct = 0.0f0
+    for i in 1:kernel_size
+        for j in 1:kernel_size
+            @inbounds dotproduct += input[y-1+j,x-1+i] * kernel[j,i]
+        end
+    end
+    return dotproduct
+end
+
+function custom_conv2(input,result,kernel)
+    input_c = size(input,1)
+    input_r = size(input,2)
+    kernel_c = size(kernel,1)
+    kernel_r = size(kernel,2)
+    result_c = size(result,1)
+    result_r = size(result,2)
+    #result hat dimensionen [input_r - kernel_r + 1,input_c - kernel_c + 1]
+
+    for i in 1:result_r
+        for j in result_c
+            @inbounds result[i,j] = tensordot(input,i,j,kernel,kernel_c)
+        end
+    end
+end
+
+
+
 function get_memory_requirements(number_inputs, number_outputs, brain_cfg::CTRNN_Cfg)
     return sizeof(Float32) * (
         brain_cfg.number_neurons *
@@ -55,7 +84,10 @@ function brain_initialize(threadID, blockID, V, W, T, individuals, brain_cfg::CT
     return
 end
 
-function brain_step(threadID,blockID, temp_V, V, W, T, x, input, action, brain_cfg::CTRNN_Cfg)#alpha, delta_t,clipping_range_min,clipping_range_max)
+function brain_step(threadID,blockID, temp_V, V, W, T, x, input, action, brain_cfg::CTRNN_Cfg)
+
+    #treat image input as grey_scale
+
     input_size = size(V, 2)
     output_size = size(T, 1)
 

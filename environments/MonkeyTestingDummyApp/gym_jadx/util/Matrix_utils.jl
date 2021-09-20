@@ -34,12 +34,8 @@ end
 #TODO make work for src images with more rows than threadnumber
 function __blit_single_channel_inplace(threadID, dest, src, channel, x, y)
     if threadID <= size(src, 3)
-        #@cushow(x-1+threadID)
         for i = 1:size(src, 2)
-            if threadID == 1
-                #@cushow(y-1+i)
-            end
-            dest[channel, y-1+i, x-1+threadID] = src[channel,i, threadID]
+            @inbounds dest[channel, y-1+i, x-1+threadID] = src[channel,i, threadID]
         end
     end
     return
@@ -47,22 +43,14 @@ end
 function __blit_single_channel_inplace(threadID,blockID, dest, src, channel, x, y)
     if ndims(src) == 3
         if threadID <= size(src, 3)
-            #@cushow(x-1+threadID)
             for i = 1:size(src, 2)
-                if threadID == 1
-                    #@cushow(y-1+i)
-                end
-                dest[channel, y-1+i, x-1+threadID,blockID] = src[channel,i, threadID]
+                @inbounds dest[channel, y-1+i, x-1+threadID,blockID] = src[channel,i, threadID]
             end
         end
     else 
         if threadID <= size(src, 3)
-            #@cushow(x-1+threadID)
             for i = 1:size(src, 2)
-                if threadID == 1
-                    #@cushow(y-1+i)
-                end
-                dest[channel, y-1+i, x-1+threadID,blockID] = src[channel,i, threadID,blockID]
+                @inbounds dest[channel, y-1+i, x-1+threadID,blockID] = src[channel,i, threadID,blockID]
             end
         end
     end
