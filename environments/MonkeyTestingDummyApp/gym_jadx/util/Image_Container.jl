@@ -1,6 +1,6 @@
 using CUDA
 using Adapt
-using ImageView, Images
+using Images
 include("Matrix_utils.jl")
 include("Enum_Collection.jl")
 
