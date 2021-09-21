@@ -7,7 +7,7 @@
 1. The NeuroEvolution.jl framework uses the CUDA.jl package, install this package first and make sure it is working: https://cuda.juliagpu.org/stable/
 2. Execute the train.jl to start the training.
 
-## Running the Unit tests
+## Running the unit tests
 
 You need our slightly modified Deap version for some unit tests, more precisely for executing the optimizers.jl script. This modified Deap version exposes some extra states of the CMA-ES algorithm, but the calculation itself does not differ from the original version. To install our modified Deap version do the following: 
 
