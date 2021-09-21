@@ -9,7 +9,7 @@
 
 ## Running the unit tests
 
-You need our slightly modified Deap version for some unit tests, more precisely for executing the `optimizers.jl` script. This modified Deap version exposes some extra states of the CMA-ES algorithm, but the calculation itself does not differ from the original version. To install our modified Deap version do the following: 
+You need our slightly modified Deap version for some unit tests, more precisely for executing the `optimizers.jl` script. This modified Deap version exposes some extra states of the CMA-ES algorithm that are required for testing, but the calculation itself does not differ from the original version. To install our modified Deap version do the following: 
 
 1. Uninstall the deap package if already installed via `pip uninstall deap`
 2. Run `pip install git+https://github.com/neuroevolution-ai/deap@test-cma-es-in-julia` 
