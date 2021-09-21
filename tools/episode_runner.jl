@@ -1,7 +1,5 @@
-####Imports
 using CUDA
 using Random
-#include("brains/continuous_time_rnn.jl")
 
 
 function kernel_eval_fitness(

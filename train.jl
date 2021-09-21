@@ -45,13 +45,16 @@ function main()
 
     config = TrainingCfg(configuration)
 
-    # Get environment type from configuration TODO
+    # Get environment type from configuration 
+    # TODO: Choose environment type from configuration
     environment_type = CollectPoints
 
-    # Get brain type from configuration TODO
+    # Get brain type from configuration
+    # TODO: Choose brain type from configuration
     brain_type = ContinuousTimeRNN
 
-    # Get optimizer type from configuration TODO
+    # Get optimizer type from configuration 
+    # TODO: Choose optimizer type from configuration
     optimizer_type = OptimizerCmaEs
 
     number_individuals = config.optimizer["population_size"]
@@ -65,11 +68,11 @@ function main()
     # Initialize brains 
     brains = brain_type(config.brain, number_inputs, number_individuals)
 
-    brain_state = generate_brain_state(number_inputs, number_outputs, config.brain)
-    free_parameters = get_individual_size(brain_state)
+    # TODO: Refactor this
+    individual_size = get_individual_size(generate_brain_state(number_inputs, number_outputs, config.brain))
 
     # Initialize optimizer
-    optimizer = optimizer_type(free_parameters, config.optimizer)
+    optimizer = optimizer_type(individual_size, config.optimizer)
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
@@ -108,9 +111,9 @@ function main()
         tell(optimizer, rewards_training)
         best_genome_current_generation = individuals[(findmax(rewards_training))[2], :]
         rewards_validation = CUDA.fill(0.0f0, config.number_validation_runs)
-        validation_individuals = fill(0.0f0, config.number_validation_runs, free_parameters)
+        validation_individuals = fill(0.0f0, config.number_validation_runs, individual_size)
         for i = 1:config.number_validation_runs
-            for j = 1:free_parameters
+            for j = 1:individual_size
                 validation_individuals[i, j] = best_genome_current_generation[j]
             end
         end
@@ -175,7 +178,7 @@ function main()
         number_inputs,
         number_outputs,
         number_individuals,
-        free_parameters,
+        individual_size,
         now() - start_time_training,
     )
 end
