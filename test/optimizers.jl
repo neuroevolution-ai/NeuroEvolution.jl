@@ -1,4 +1,5 @@
 using Test
+using DataStructures
 
 include("../optimizers/cma_es.jl")
 include("optimizers/cma_es_deap.jl")
@@ -13,7 +14,7 @@ tolerance = 0.00001
 
 @testset "Optimizers" begin
 
-    optimizer_configuration = Dict("sigma" => sigma, "population_size" => population_size)
+    optimizer_configuration = OrderedDict("sigma" => sigma, "population_size" => population_size)
 
     # Initialize Optimizers
     # OptimizerCmaEsDeap: Original Deap CMA-ES optimizer implemented in Python using PyCall

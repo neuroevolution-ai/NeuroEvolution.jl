@@ -26,7 +26,7 @@ mutable struct OptimizerCmaEsDeap
     BD::Any
     genomes::Any
 
-    function OptimizerCmaEsDeap(individual_size::Int, configuration::Dict)
+    function OptimizerCmaEsDeap(individual_size::Int, configuration::OrderedDict)
         scriptdir = @__DIR__
         pushfirst!(PyVector(pyimport("sys")."path"), scriptdir)
         optimizer_deap = pyimport("cma_es_deap")

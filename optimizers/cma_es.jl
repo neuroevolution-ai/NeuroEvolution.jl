@@ -7,7 +7,7 @@ struct OptimizerCmaEsCfg
     population_size::Int
     sigma::Float64
 
-    function OptimizerCmaEsCfg(configuration::Dict)
+    function OptimizerCmaEsCfg(configuration::OrderedDict)
         new(configuration["population_size"], configuration["sigma"])
     end
 end
@@ -35,7 +35,7 @@ mutable struct OptimizerCmaEs
     BD::Any
     genomes::Any
 
-    function OptimizerCmaEs(individual_size::Int, optimizer_configuration::Dict; test = false, eigenvectors1 = Nothing, indx1 = Nothing)
+    function OptimizerCmaEs(individual_size::Int, optimizer_configuration::OrderedDict; test = false, eigenvectors1 = Nothing, indx1 = Nothing)
 
         config = OptimizerCmaEsCfg(optimizer_configuration)
 
