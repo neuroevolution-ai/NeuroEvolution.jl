@@ -30,8 +30,8 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Float32, configuration["reward_per_collected_positive_point"]),
         convert(Float32, configuration["reward_per_collected_negative_point"]),
         convert(Int32, configuration["number_time_steps"]),
-        get_number_inputs(),
-        get_number_outputs(),
+        10,
+        2,
         CUDA.fill(
             1,
             (
@@ -75,12 +75,14 @@ function get_memory_requirements(env_cfg::CollectPoints)
     return sizeof(Int32) * (env_cfg.maze_columns * env_cfg.maze_rows * 6 + 10)
 end
 
-function get_number_inputs()
-    return 10
+function get_number_inputs(environments::CollectPoints)
+    return environments.number_inputs
 end
-function get_number_outputs()
-    return 2
+
+function get_number_outputs(environments::CollectPoints)
+    return environments.number_outputs
 end
+
 function get_observation(maze, input, environment_config_array, env_cfg)
     cell_x =
         convert(Int32, ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))

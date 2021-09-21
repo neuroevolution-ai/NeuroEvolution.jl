@@ -54,19 +54,19 @@ function main()
     # Get optimizer type from configuration TODO
     optimizer_type = OptimizerCmaEs
 
-    number_inputs = get_number_inputs()
-    number_outputs = get_number_outputs()
-
-    brain_state = generate_brain_state(number_inputs, number_outputs, config.brain)
-    free_parameters = get_individual_size(brain_state)
-
     number_individuals = config.optimizer["population_size"]
 
     # Initialize environments
     environments = environment_type(config.environment, number_individuals)
 
+    number_inputs = get_number_inputs(environments)
+    number_outputs = get_number_outputs(environments)
+
     # Initialize brains 
     brains = brain_type(config.brain, number_inputs, number_individuals)
+
+    brain_state = generate_brain_state(number_inputs, number_outputs, config.brain)
+    free_parameters = get_individual_size(brain_state)
 
     # Initialize optimizer
     optimizer = optimizer_type(free_parameters, config.optimizer)
