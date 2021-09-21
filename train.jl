@@ -82,7 +82,7 @@ function main()
         get_memory_requirements(number_inputs, number_outputs, brains) +
         get_memory_requirements(environments)
 
-    # Get start time of training and Date
+    # Get start time of training and date
     start_time_training = now()
 
     log = OrderedDict()
@@ -91,25 +91,33 @@ function main()
     for generation = 1:config.number_generations
 
         start_time_generation = now()
+
+        # Environment seed for this generation (excludes validation environment seeds)
         env_seed = Random.rand(config.number_validation_runs:config.maximum_env_seed)
-        env_seeds_gpu = CUDA.fill(env_seed, number_individuals)
+
+        # Ask optimizer for new population
         individuals = ask(optimizer)
 
-        individuals_gpu = CuArray(individuals)
         fitness_results = CUDA.fill(0.0f0, number_individuals)
-        @cuda threads = brains.number_neurons blocks = number_individuals shmem =
-            required_shared_memory kernel_eval_fitness(
-            individuals_gpu,
+        # Training runs for candidates
+        @cuda threads = brains.number_neurons blocks = number_individuals shmem = required_shared_memory kernel_eval_fitness(
+            CuArray(individuals),
             fitness_results,
-            env_seeds_gpu,
+            CUDA.fill(env_seed, number_individuals),
             config.number_rounds,
             brains,
             environments,
         )
+
         CUDA.synchronize()
+        
         rewards_training = Array(fitness_results)
+
+        # Tell optimizer new rewards
         tell(optimizer, rewards_training)
+        
         best_genome_current_generation = individuals[(findmax(rewards_training))[2], :]
+        
         rewards_validation = CUDA.fill(0.0f0, config.number_validation_runs)
         validation_individuals = fill(0.0f0, config.number_validation_runs, individual_size)
         for i = 1:config.number_validation_runs
@@ -117,20 +125,20 @@ function main()
                 validation_individuals[i, j] = best_genome_current_generation[j]
             end
         end
-        env_seeds_validation = 1:config.number_validation_runs
 
-        @cuda threads = brains.number_neurons blocks = config.number_validation_runs shmem =
-            required_shared_memory kernel_eval_fitness(
+        # Validation runs for best individual
+        @cuda threads = brains.number_neurons blocks = config.number_validation_runs shmem = required_shared_memory kernel_eval_fitness(
             CuArray(validation_individuals),
             rewards_validation,
-            CuArray(env_seeds_validation),
+            CuArray(1:config.number_validation_runs),
             1,
             brains,
             environments,
         )
-        CUDA.synchronize()
-        rewards_validation_cpu = Array(rewards_validation)
 
+        CUDA.synchronize()
+
+        rewards_validation_cpu = Array(rewards_validation)
 
         best_reward_current_generation = mean(rewards_validation_cpu)
         if best_reward_current_generation > best_reward_overall
