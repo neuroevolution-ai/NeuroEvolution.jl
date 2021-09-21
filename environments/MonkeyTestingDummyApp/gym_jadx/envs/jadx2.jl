@@ -2,14 +2,14 @@ using CUDA
 using Adapt
 using StructArrays
 using Images
-#using ImageView
+using ImageView
 using Random
 using Test
 include("../util/Matrix_utils.jl")
-include("../util/Image_Container.jl")
 include("../util/Enum_Collection.jl")
 include("../ui/Window.jl")
 include("../ui/Button.jl")
+include("../ui/Drawables.jl")
 
 struct Jadx_Environment{A,B,C,D}
     all_windows::A
@@ -19,59 +19,16 @@ struct Jadx_Environment{A,B,C,D}
 end
 Adapt.@adapt_structure Jadx_Environment
 
-function get_window(name::Enum,windows::All_Windows)#::Window
-    if name == main_window
-        return windows.main_window
-    else 
-        return windows.main_window
-    end
-end
-
-
 function init_components()
 end
-function reset(env::Jadx_Environment)
-    fill!(env.windows[:,blockIdx().x],no_window)
-    #reset_all_Buttons
-    #reset_all_windows
-    env.windows[1,blockIdx().x] = main_window
-    for window in env.windows[:,blockIdx().x]
-        if window ≠ no_window
-            current_window = get_window(window,env.all_windows)
-            draw_self(current_window,env.all_windows,env.all_buttons)
-            sync_threads()
-            kernel_blit_image_inplace(threadIdx().x,blockIdx().x,env.frame_buffer,current_window.current_matrix,current_window.x_Coord,current_window.y_Coord) 
-        end
-    end
-    return env.frame_buffer
-end
-
 
 function env_initialize(env::Jadx_Environment)
 
 end
 
-
-function kernel(env::Jadx_Environment)
- tx = threadIdx().x
-
-    env_initialize(env)
-    reset(env)
-    sync_threads()
-
-    #=
-    reward,clicked,matrix,coords_x,coords_y = click(60,25,env.all_windows.main_window,env.all_buttons)
-    sync_threads()
-    if clicked
-        kernel_blit_image_inplace(threadIdx().x,env.frame_buffer,matrix,coords_x,coords_y)
-    end
-    =#
-    return
-end
-
 function init_app_close_button(number_individuals)
     matrix_unclicked = CuArray(get_array_of_image("close_window_button_large_unclicked.png"))
-    return Button(380,1,size(matrix_unclicked,3),size(matrix_unclicked,2),2,similar(matrix_unclicked),matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
+    return Button(380,1,size(matrix_unclicked,3),size(matrix_unclicked,2),2,matrix_unclicked,matrix_unclicked,CUDA.fill(false,(2,number_individuals)),true,placeholder)
 end
 
 function init_dropdown_button_datei(position,number_individuals)
@@ -255,31 +212,9 @@ function init_all_windows(number_individuals)
 end
 
 
-function initialize()
-
-    all_buttons = init_all_buttons(number_individuals)
-    #init All Buttons
-
-    all_windows = init_all_windows()
-    #init all Windows
-    windows = Array{Window_Names}(undef,5)
-
-    frame_buffer = similar(all_windows.main_window.matrix_self)
-    return Jadx_Environment(all_windows,all_buttons,CuArray(windows),frame_buffer)
-end
-
-
-#=
-env = initialize()
-imshow(colorview(RGB,Array(env.frame_buffer)))
-@cuda threads=500 kernel(env)
-CUDA.synchronize()
-imshow(colorview(RGB,Array(env.frame_buffer)))
-=#
-
 
 function initialize2()
-    number_individuals = 10
+    number_individuals = 100
 
     all_buttons = init_all_buttons(number_individuals)
     #init All Buttons
@@ -309,27 +244,6 @@ function reset2(env::Jadx_Environment)
 
 end
 
-function fill_input(dest,src)
-    if threadIdx().x <= size(src,3)
-        for i in 1:size(src,1)
-            for j in 1:size(src,2)
-                @inbounds dest[i,j,threadIdx().x] = convert(Float32,src[i,j,threadIdx().x,blockIdx().x])
-            end
-        end
-    end
-end
-
-
-function grayscale(dest,src)
-    if threadIdx().x <= size(src,3)
-        for i in 1:size(src,2)
-            @inbounds dest[i,threadIdx().x,blockIdx().x] = src[1,i,threadIdx().x,blockIdx().x]#*(0.21f0) + convert(Float32,src[2,i,threadIdx().x,blockIdx().x]) *(0.71f0) + convert(Float32,src[3,i,threadIdx().x,blockIdx().x]) * (0.07f0)
-            if blockIdx().x == 1
-            #@cushow(convert(Float32,src[1,i,threadIdx().x,blockIdx().x]))
-            end
-        end
-    end
-end
 
 function step(env::Jadx_Environment,action,input)
     reward = 0
@@ -378,7 +292,7 @@ function kernel3(env::Jadx_Environment,input)
     for round in 1:1
 
         reset2(env)
-        for i in 1:5
+        for i in 1:1000
             if threadIdx().x == 1
                 action[1] = rand(Float32)
                 action[2] = rand(Float32)
@@ -393,8 +307,8 @@ end
 env = initialize2()
 width = env.all_windows.main_window.width
 height = env.all_windows.main_window.height
-input = CUDA.fill(0.0f0,(268,400,10))
-@cuda threads=400 blocks=10 shmem=sizeof(Float32)*2 kernel3(env,input)
+input = CUDA.fill(0.0f0,(268,400,100))
+@cuda threads=400 blocks=100 shmem=sizeof(Float32)*2 kernel3(env,input)
 CUDA.synchronize()
 
 display(Array(input))
@@ -403,7 +317,7 @@ display(Array(input))
 #imshow(colorview(Gray,Array(input[:,:,1])))
 
 
-#=
+
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,1])))
 
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,2])))
@@ -415,7 +329,7 @@ imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,7])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,8])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,9])))
 imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,10])))
-=#
+
 
 
 function episode(number_time_steps,number_rounds,environment_cfg::Jadx_Environment)

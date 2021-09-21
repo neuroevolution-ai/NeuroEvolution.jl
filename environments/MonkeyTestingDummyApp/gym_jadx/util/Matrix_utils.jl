@@ -88,3 +88,24 @@ function get_blank_image_as_array(color_red,color_green,_color_blue,width,height
     fill_array(result_array,color_green,2)
     fill_array(result_array,_color_blue,3)
 end
+
+function grayscale(dest,src)
+    if threadIdx().x <= size(src,3)
+        for i in 1:size(src,2)
+            @inbounds dest[i,threadIdx().x,blockIdx().x] = src[1,i,threadIdx().x,blockIdx().x] * (0.21f0) + convert(Float32,src[2,i,threadIdx().x,blockIdx().x]) *(0.71f0) + convert(Float32,src[3,i,threadIdx().x,blockIdx().x]) * (0.07f0)
+            if blockIdx().x == 1
+            #@cushow(convert(Float32,src[1,i,threadIdx().x,blockIdx().x]))
+            end
+        end
+    end
+end
+
+function fill_input(dest,src)
+    if threadIdx().x <= size(src,3)
+        for i in 1:size(src,1)
+            for j in 1:size(src,2)
+                @inbounds dest[i,j,threadIdx().x] = convert(Float32,src[i,j,threadIdx().x,blockIdx().x])
+            end
+        end
+    end
+end

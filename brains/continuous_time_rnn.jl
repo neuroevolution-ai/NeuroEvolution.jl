@@ -29,16 +29,16 @@ function tensordot(input,x,y,kernel,kernel_size)
 end
 
 function custom_conv2(input,result,kernel)
-    input_c = size(input,1)
-    input_r = size(input,2)
-    kernel_c = size(kernel,1)
-    kernel_r = size(kernel,2)
+    #input_c = size(input,1)
+    #input_r = size(input,2)
+    #kernel_c = size(kernel,1)
+    #kernel_r = size(kernel,2)
     result_c = size(result,1)
     result_r = size(result,2)
     #result hat dimensionen [input_r - kernel_r + 1,input_c - kernel_c + 1]
 
-    for i in 1:result_r
-        for j in result_c
+    for i in 1:result_r#range(1,result_r,2)
+        for j in 1:result_c
             @inbounds result[i,j] = tensordot(input,i,j,kernel,kernel_c)
         end
     end
@@ -90,48 +90,54 @@ function brain_step(threadID,blockID, temp_V, V, W, T, x, input, action, brain_c
 
     input_size = size(V, 2)
     output_size = size(T, 1)
-
     if brain_cfg.differential_equation == original
-        #V * input multiplication
-        V_value = 0.0f0
-        for i = 1:input_size
-            @inbounds V_value += V[threadID, i] * input[i]
-            #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
-        end
-        #
-        @inbounds temp_V[threadID] = tanh(x[threadID] + V_value)
+        if threadID <= size(W,2)
+            #V * input multiplication
+            V_value = 0.0f0
+            for i = 1:input_size
+                @inbounds V_value += V[threadID, i] * input[i]
+                #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
+            end
+            #
+            @inbounds temp_V[threadID] = tanh(x[threadID] + V_value)
         
 
-        #W * result of Vmult
-        W_value = 0.0f0
-        for i = 1:brain_cfg.number_neurons
-            @inbounds W_value += W[threadID, i] * temp_V[i]
+            #W * result of Vmult
+            W_value = 0.0f0
+            for i = 1:brain_cfg.number_neurons
+                @inbounds W_value += W[threadID, i] * temp_V[i]
+            end
+            #
+            dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
         end
-        #
-        dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
     elseif brain_cfg.differential_equation == separated
-        V_value = 0.0f0
-        for i = 1:input_size
-            @inbounds V_value += V[threadID, i] * input[i]
-            #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
+        if threadID <= size(W,2)
+            V_value = 0.0f0
+            for i = 1:input_size
+                @inbounds V_value += V[threadID, i] * input[i]
+                #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
+            end
+            @inbounds temp_V[threadID] = V_value
+            W_value = 0.0f0
+            for i = 1:brain_cfg.number_neurons
+                @inbounds W_value += W[threadID, i] * tanh(x[i])
+                #@inbounds W_value += brain_cfg.W[threadID, i,blockID] * tanh(brain_cfg.x[i,blockID])
+            end
+            temp_V[threadID] += W_value
+            dx_dt = (-brain_cfg.alpha * x[threadID]) + temp_V[threadID]
+            #dx_dt2 = (-brain_cfg.alpha * brain_cfg.x[threadID,blockID]) + temp_V[threadID]
+    
         end
-        @inbounds temp_V[threadID] = V_value
-        W_value = 0.0f0
-        for i = 1:brain_cfg.number_neurons
-            @inbounds W_value += W[threadID, i] * tanh(x[i])
-            #@inbounds W_value += brain_cfg.W[threadID, i,blockID] * tanh(brain_cfg.x[i,blockID])
-        end
-        temp_V[threadID] += W_value
-        dx_dt = (-brain_cfg.alpha * x[threadID]) + temp_V[threadID]
-        #dx_dt2 = (-brain_cfg.alpha * brain_cfg.x[threadID,blockID]) + temp_V[threadID]
     end
-    @inbounds x[threadID] += (brain_cfg.delta_t * dx_dt)
-    @inbounds x[threadID] =
+    if threadID <= size(W,2)
+        @inbounds x[threadID] += (brain_cfg.delta_t * dx_dt)
+        @inbounds x[threadID] =
         clamp(x[threadID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)
 
-    #@inbounds brain_cfg.x[threadID,blockID] += (brain_cfg.delta_t * dx_dt2)
-    #@inbounds brain_cfg.x[threadID,blockID] =
-    #    clamp(brain_cfg.x[threadID,blockID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)
+        #@inbounds brain_cfg.x[threadID,blockID] += (brain_cfg.delta_t * dx_dt2)
+        #@inbounds brain_cfg.x[threadID,blockID] =
+        #clamp(brain_cfg.x[threadID,blockID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)
+    end
     sync_threads()
 
     #T*temp_W matmul:
@@ -201,3 +207,28 @@ function get_individual_size(brain_state)
     usage_dict = get_free_parameter_usage(brain_state)
     return sum_dict(usage_dict)
 end
+
+function get_max_pixel(i,threadID,input)
+    max_pixel = 0.0f0
+
+    #Fall threadID ungerade
+    if threadID % 2 == 1
+        max_pixel = max(input[i])
+    end
+
+    return max_pixel
+end
+
+
+function max_Pooling(input,result,pool_size)
+    if threadID <= size(result,2)
+
+        for i in 1:size(result,1)
+            @inbounds result[i,threadID] = 
+        end
+    end
+end
+
+
+a = CUDA.rand(Float32,(268,400))
+kernel_cpu = 
