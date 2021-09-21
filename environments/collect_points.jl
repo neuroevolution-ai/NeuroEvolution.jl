@@ -32,15 +32,7 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Int32, configuration["number_time_steps"]),
         10,
         2,
-        CUDA.fill(
-            1,
-            (
-                configuration["maze_rows"],
-                configuration["maze_columns"],
-                4,
-                number_individuals,
-            ),
-        ),
+        CUDA.fill(1, (configuration["maze_rows"], configuration["maze_columns"], 4, number_individuals)),
         CUDA.fill(0, (6, number_individuals)),
     )
 end
@@ -84,10 +76,8 @@ function get_number_outputs(environments::CollectPoints)
 end
 
 function get_observation(maze, input, environment_config_array, env_cfg)
-    cell_x =
-        convert(Int32, ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))
-    cell_y =
-        convert(Int32, ceil(@inbounds environment_config_array[2] / env_cfg.maze_cell_size))
+    cell_x = convert(Int32, ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))
+    cell_y = convert(Int32, ceil(@inbounds environment_config_array[2] / env_cfg.maze_cell_size))
     screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
     screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
 
@@ -173,18 +163,12 @@ function get_observation(maze, input, environment_config_array, env_cfg)
         sensor_distance
     end
 
-    @inbounds input[1] =
-        convert(Float32, @inbounds environment_config_array[1] / screen_width)
-    @inbounds input[2] =
-        convert(Float32, @inbounds environment_config_array[2] / screen_height)
-    @inbounds input[3] =
-        convert(Float32, @inbounds environment_config_array[3] / screen_width)
-    @inbounds input[4] =
-        convert(Float32, @inbounds environment_config_array[4] / screen_height)
-    @inbounds input[5] =
-        convert(Float32, @inbounds environment_config_array[5] / screen_width)
-    @inbounds input[6] =
-        convert(Float32, @inbounds environment_config_array[6] / screen_height)
+    @inbounds input[1] = convert(Float32, @inbounds environment_config_array[1] / screen_width)
+    @inbounds input[2] = convert(Float32, @inbounds environment_config_array[2] / screen_height)
+    @inbounds input[3] = convert(Float32, @inbounds environment_config_array[3] / screen_width)
+    @inbounds input[4] = convert(Float32, @inbounds environment_config_array[4] / screen_height)
+    @inbounds input[5] = convert(Float32, @inbounds environment_config_array[5] / screen_width)
+    @inbounds input[6] = convert(Float32, @inbounds environment_config_array[6] / screen_height)
     @inbounds input[7] = convert(Float32, sensor_north / screen_height)
     @inbounds input[8] = convert(Float32, sensor_east / screen_width)
     @inbounds input[9] = convert(Float32, sensor_south / screen_height)

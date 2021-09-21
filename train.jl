@@ -152,18 +152,12 @@ function main()
         log_line["elapsed_time"] = elapsed_time_current_generation
         log[generation] = log_line
         println(
-            "Generation:",
-            generation,
-            " Min:",
-            findmin(rewards_training)[1],
-            " Mean:",
-            mean(rewards_training),
-            " Max:",
-            findmax(rewards_training)[1],
-            " Best:",
-            best_reward_overall,
-            " elapsed time (s):",
-            elapsed_time_current_generation,
+            "Generation:", generation,
+            " Min:", findmin(rewards_training)[1],
+            " Mean:", mean(rewards_training),
+            " Max:", findmax(rewards_training)[1],
+            " Best:", best_reward_overall,
+            " elapsed time (s):", elapsed_time_current_generation,
         )
     end
 
