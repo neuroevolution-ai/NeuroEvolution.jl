@@ -90,7 +90,11 @@ mutable struct OptimizerCmaEs
 
         optimizer = new(lambda_, dim, chiN, mu, weights, mueff, cc, cs, ps, pc, centroid, update_count, ccov1, ccovmu, C, config.sigma, damps, diagD, B, BD, genomes)
 
-        return optimizer, eigenvectors_test, indx_test, diagD_test
+        if test == true
+            return optimizer, eigenvectors_test, indx_test, diagD_test
+        else
+            return optimizer
+        end
     end
 end
 
@@ -107,7 +111,11 @@ function ask(optimizer::OptimizerCmaEs; test = false, randoms1 = Nothing)
 
     optimizer.genomes = optimizer.centroid' .+ (optimizer.sigma .* (randoms * optimizer.BD'))
 
-    return optimizer.genomes, randoms_test
+    if test == true
+        return optimizer.genomes, randoms_test
+    else
+        return optimizer.genomes
+    end
 
 end
 
@@ -177,6 +185,8 @@ function tell(optimizer::OptimizerCmaEs, rewards_training; test = false, eigenve
     optimizer.B = optimizer.B[:, indx]
     optimizer.BD = optimizer.B .* optimizer.diagD'
 
-    return eigenvectors_test, indx_test, diagD_test
+    if test == true
+        return eigenvectors_test, indx_test, diagD_test
+    end
 
 end
