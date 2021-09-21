@@ -6,12 +6,12 @@ function training_runs(individuals, number_individuals, brains, environments; en
     rewards = CUDA.fill(0.0f0, number_individuals)
     
     CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
-        CUDA.CuArray(individuals),
-        rewards,
-        CUDA.fill(env_seed, number_individuals),
-        number_rounds,
-        brains,
-        environments,
+        individuals = CUDA.CuArray(individuals),
+        rewards = rewards,
+        environment_seeds = CUDA.fill(env_seed, number_individuals),
+        number_rounds = number_rounds,
+        brains = brains,
+        environments = environments,
     )
 
     CUDA.synchronize()
@@ -24,21 +24,21 @@ function validation_runs(individual, individual_size, number_validation_runs, br
     
     rewards = CUDA.fill(0.0f0, number_validation_runs)
     
-    validation_individuals = fill(0.0f0, number_validation_runs, individual_size)
+    individuals = fill(0.0f0, number_validation_runs, individual_size)
 
     for i = 1:number_validation_runs
         for j = 1:individual_size
-            validation_individuals[i, j] = individual[j]
+            individuals[i, j] = individual[j]
         end
     end
     
     CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
-        CuArray(validation_individuals),
-        rewards,
-        CuArray(1:number_validation_runs),
-        1,
-        brains,
-        environments,
+        individuals = CuArray(individuals),
+        rewards = rewards,
+        environment_seeds = CuArray(1:number_validation_runs),
+        number_rounds = 1,
+        brains = brains,
+        environments = environments,
     )
 
     CUDA.synchronize()
@@ -47,14 +47,8 @@ function validation_runs(individual, individual_size, number_validation_runs, br
 
 end
 
-function kernel_eval_fitness(
-    individuals,
-    rewards,
-    environment_seeds,
-    number_rounds,
-    brains::ContinuousTimeRNN,
-    environments::CollectPoints,
-)
+function kernel_eval_fitness(;individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
+
     tx = threadIdx().x
     fitness_total = 0
 
