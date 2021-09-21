@@ -5,7 +5,6 @@
 ## Quick start
 
 1. The NeuroEvolution.jl framework uses the CUDA.jl package, install this package first and make sure it is working: https://cuda.juliagpu.org/stable/
-
 2. Execute the train.jl to start the training.
 
 ## Running the Unit tests
