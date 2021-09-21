@@ -7,7 +7,7 @@ using DataStructures
 
 include("environments/collect_points_env.jl")
 include("brains/continuous_time_rnn.jl")
-include("optimizers/optimizer.jl")
+include("optimizers/cma_es.jl")
 include("tools/episode_runner.jl")
 include("tools/write_results.jl")
 
@@ -24,11 +24,11 @@ function main()
     maximum_env_seed = configuration["maximum_env_seed"]
     environment = configuration["environment"]
     brain = configuration["brain"]
-    optimizer = configuration["optimizer"]
+    optimizer_configuration = configuration["optimizer"]
     number_inputs = get_number_inputs()
     number_outputs = get_number_outputs()
 
-    number_individuals = optimizer["population_size"]
+    number_individuals = optimizer_configuration["population_size"]
     #env_config init
     mazes = CUDA.fill(1,(environment["maze_rows"],environment["maze_columns"],4,number_individuals))
     agents = CUDA.fill(0,(6,number_individuals))
@@ -63,7 +63,7 @@ function main()
     brain_state = generate_brain_state(number_inputs, number_outputs, brain)
     free_parameters = get_individual_size(brain_state)
 
-    optimizer = inititalize_optimizer(free_parameters, optimizer)
+    optimizer = OptimizerCmaEs(free_parameters, optimizer_configuration)
 
     #get start time of training and Date
 
@@ -85,15 +85,8 @@ function main()
         start_time_generation = now()
         env_seed = Random.rand(number_validation_runs:maximum_env_seed)
         env_seeds_gpu = CUDA.fill(env_seed, number_individuals)
-        individuals = fill(0.0f0, number_individuals, free_parameters)
-        genomes = ask(optimizer)
+        individuals = ask(optimizer)
 
-        #the optimizer generates the genomes as an Array of Arrays, which the GPU cannot work with, so the genomes need to be reshaped into a MxN matrix.
-        for i = 1:number_individuals
-            for j = 1:free_parameters
-                individuals[i, j] = (genomes[i])[j]
-            end
-        end
         individuals_gpu = CuArray(individuals)
         fitness_results = CUDA.fill(0.0f0, number_individuals)
         @cuda threads = brain_cfg.number_neurons blocks = number_individuals shmem =
@@ -108,7 +101,7 @@ function main()
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
         tell(optimizer, rewards_training)
-        best_genome_current_generation = genomes[(findmax(rewards_training))[2]]
+        best_genome_current_generation = individuals[(findmax(rewards_training))[2], :]
         rewards_validation = CUDA.fill(0.0f0, number_validation_runs)
         validation_individuals = fill(0.0f0, number_validation_runs, free_parameters)
         for i = 1:number_validation_runs
