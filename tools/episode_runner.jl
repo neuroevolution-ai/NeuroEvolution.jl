@@ -9,8 +9,8 @@ function kernel_eval_fitness(
     results,
     env_seeds,
     number_rounds,
-    brain_cfg::CTRNN_Cfg,
-    environment_cfg::Collect_Points_Env_Cfg,
+    brain_cfg::ContinuousTimeRNN,
+    environment_cfg::CollectPoints,
 )
     tx = threadIdx().x
     fitness_total = 0

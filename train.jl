@@ -5,120 +5,125 @@ using Statistics
 using Dates
 using DataStructures
 
-include("environments/collect_points_env.jl")
+include("environments/collect_points.jl")
 include("brains/continuous_time_rnn.jl")
 include("optimizers/cma_es.jl")
 include("tools/episode_runner.jl")
 include("tools/write_results.jl")
 
+struct TrainingCfg
+    number_generations::Int
+    number_validation_runs::Int
+    number_rounds::Int
+    maximum_env_seed::Int
+    environment::OrderedDict
+    brain::OrderedDict
+    optimizer::OrderedDict
+    experiment_id::Int
+
+    function TrainingCfg(configuration::OrderedDict)
+        new(
+            configuration["number_generations"],
+            configuration["number_validation_runs"],
+            configuration["number_rounds"],
+            configuration["maximum_env_seed"],
+            configuration["environment"],
+            configuration["brain"],
+            configuration["optimizer"],
+            get(configuration, "experiment_id", -1),
+        )
+    end
+end
+
 
 function main()
-    configuration = JSON.parsefile(
-        "configurations/CMA_ES_Deap_CTRNN_Dense.json",
-        dicttype = DataStructures.OrderedDict,
-    )
 
-    number_generations = configuration["number_generations"]
-    number_validation_runs = configuration["number_validation_runs"]
-    number_rounds = configuration["number_rounds"]
-    maximum_env_seed = configuration["maximum_env_seed"]
-    environment = configuration["environment"]
-    brain = configuration["brain"]
-    optimizer_configuration = configuration["optimizer"]
+    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense.json"
+
+    # Load configuration file
+    configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
+
+    config = TrainingCfg(configuration)
+
+    # Get environment type from configuration TODO
+    environment_type = CollectPoints
+
+    # Get brain type from configuration TODO
+    brain_type = ContinuousTimeRNN
+
+    # Get optimizer type from configuration TODO
+    optimizer_type = OptimizerCmaEs
+
     number_inputs = get_number_inputs()
     number_outputs = get_number_outputs()
 
-    number_individuals = optimizer_configuration["population_size"]
-    #env_config init
-    mazes = CUDA.fill(1,(environment["maze_rows"],environment["maze_columns"],4,number_individuals))
-    agents = CUDA.fill(0,(6,number_individuals))
-    environment_cfg = Collect_Points_Env_Cfg(
-        environment["maze_columns"],
-        environment["maze_rows"],
-        convert(Int32,environment["maze_cell_size"]),
-        environment["agent_radius"],
-        convert(Int32,environment["point_radius"]),
-        convert(Float32,environment["agent_movement_range"]),
-        convert(Float32,environment["reward_per_collected_positive_point"]),
-        convert(Float32,environment["reward_per_collected_negative_point"]),
-        convert(Int32,environment["number_time_steps"]),
-        number_inputs,
-        number_outputs,mazes,agents
-    )
-    #
-    #brain_config init
-    V = CUDA.fill(0.0f0,(brain["number_neurons"],number_inputs,number_individuals))
-    W = CUDA.fill(0.0f0,(brain["number_neurons"],brain["number_neurons"],number_individuals))
-    T = CUDA.fill(0.0f0,(number_inputs,brain["number_neurons"],number_individuals))
-    x = CUDA.fill(0.0f0,(brain["number_neurons"],number_individuals))
-    brain_cfg = CTRNN_Cfg(
-        convert(Float32,brain["delta_t"]),
-        brain["number_neurons"],
-        separated,
-        convert(Float32,brain["clipping_range_min"]),
-        convert(Float32,brain["clipping_range_max"]),
-        convert(Float32,brain["alpha"]),V,W,T,x
-    )
-    #
-    brain_state = generate_brain_state(number_inputs, number_outputs, brain)
+    brain_state = generate_brain_state(number_inputs, number_outputs, config.brain)
     free_parameters = get_individual_size(brain_state)
 
-    optimizer = OptimizerCmaEs(free_parameters, optimizer_configuration)
+    number_individuals = config.optimizer["population_size"]
 
-    #get start time of training and Date
+    # Initialize environments
+    environments = environment_type(config.environment, number_individuals)
+
+    # Initialize brains 
+    brains = brain_type(config.brain, number_inputs, number_individuals)
+
+    # Initialize optimizer
+    optimizer = optimizer_type(free_parameters, config.optimizer)
 
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
-    required_shared_memory = sizeof(Int32) + 
-        get_memory_requirements(number_inputs, number_outputs, brain_cfg) +
-        get_memory_requirements(environment_cfg)
+
+    required_shared_memory =
+        sizeof(Int32) +
+        get_memory_requirements(number_inputs, number_outputs, brains) +
+        get_memory_requirements(environments)
+
+    # Get start time of training and Date
     start_time_training = now()
-
-
-    form = DateFormat("yyyy-mm-dd_HH-MM-SS")
-    a = floor(start_time_training, Second)
-
 
     log = OrderedDict()
 
-    for generation = 1:number_generations
+    # Run evolutionary training for given number of generations
+    for generation = 1:config.number_generations
+
         start_time_generation = now()
-        env_seed = Random.rand(number_validation_runs:maximum_env_seed)
+        env_seed = Random.rand(config.number_validation_runs:config.maximum_env_seed)
         env_seeds_gpu = CUDA.fill(env_seed, number_individuals)
         individuals = ask(optimizer)
 
         individuals_gpu = CuArray(individuals)
         fitness_results = CUDA.fill(0.0f0, number_individuals)
-        @cuda threads = brain_cfg.number_neurons blocks = number_individuals shmem =
+        @cuda threads = brains.number_neurons blocks = number_individuals shmem =
             required_shared_memory kernel_eval_fitness(
             individuals_gpu,
             fitness_results,
             env_seeds_gpu,
-            number_rounds,
-            brain_cfg,
-            environment_cfg,
+            config.number_rounds,
+            brains,
+            environments,
         )
         CUDA.synchronize()
         rewards_training = Array(fitness_results)
         tell(optimizer, rewards_training)
         best_genome_current_generation = individuals[(findmax(rewards_training))[2], :]
-        rewards_validation = CUDA.fill(0.0f0, number_validation_runs)
-        validation_individuals = fill(0.0f0, number_validation_runs, free_parameters)
-        for i = 1:number_validation_runs
+        rewards_validation = CUDA.fill(0.0f0, config.number_validation_runs)
+        validation_individuals = fill(0.0f0, config.number_validation_runs, free_parameters)
+        for i = 1:config.number_validation_runs
             for j = 1:free_parameters
                 validation_individuals[i, j] = best_genome_current_generation[j]
             end
         end
-        env_seeds_validation = 1:number_validation_runs
+        env_seeds_validation = 1:config.number_validation_runs
 
-        @cuda threads = brain_cfg.number_neurons blocks = number_validation_runs shmem =
+        @cuda threads = brains.number_neurons blocks = config.number_validation_runs shmem =
             required_shared_memory kernel_eval_fitness(
             CuArray(validation_individuals),
             rewards_validation,
             CuArray(env_seeds_validation),
             1,
-            brain_cfg,
-            environment_cfg,
+            brains,
+            environments,
         )
         CUDA.synchronize()
         rewards_validation_cpu = Array(rewards_validation)
@@ -157,7 +162,10 @@ function main()
             elapsed_time_current_generation,
         )
     end
-    result_directory = "Simulation_results/" * Dates.format(a, form)
+
+    result_directory =
+        "Simulation_results/" *
+        Dates.format(floor(start_time_training, Second), DateFormat("yyyy-mm-dd_HH-MM-SS"))
 
     mkdir(result_directory)
     write_results_to_textfile(
