@@ -5,19 +5,12 @@
 ## Quick start
 
 1. The NeuroEvolution.jl framework uses the CUDA.jl package, install this package first and make sure it is working: https://cuda.juliagpu.org/stable/
+2. Execute the `train.jl` to start the training.
 
-2. We use PyCall to integrate the covariance matrix adaptation evolution strategy (CMA-ES) from the deap package. Further, we modified the original deap package to use the GPU instead of the CPU to speed up the calculation of the eigenvalues in order to update the covariance matrix. To install our deap version, execute the following in the Julia REPL:
+## Running the unit tests
 
-```bash
-using Conda
-Conda.pip_interop(true)
-Conda.pip("install","git+https://github.com/neuroevolution-ai/deap.git@eigenvalues-on-gpu")
-```
+You need our slightly modified Deap version for some unit tests, more precisely for executing the `optimizers.jl` script. This modified Deap version exposes some extra states of the CMA-ES algorithm that are required for testing, but the calculation itself does not differ from the original version. To install our modified Deap version do the following: 
 
-As an alternative, install via pip:
-
-```bash
-pip install git+https://github.com/neuroevolution-ai/deap@eigenvalues-on-gpu
-```
-
-3. Execute the train.jl to start the training.
+1. Uninstall the deap package if already installed via `pip uninstall deap`
+2. Run `pip install git+https://github.com/neuroevolution-ai/deap@test-cma-es-in-julia` 
+3. Then the testing should work

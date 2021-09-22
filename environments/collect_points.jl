@@ -1,7 +1,7 @@
 using Adapt
 using Random
 
-struct Collect_Points_Env_Cfg{A,B}
+struct CollectPoints{A,B}
     maze_columns::Int64
     maze_rows::Int64
     maze_cell_size::Int32
@@ -15,10 +15,29 @@ struct Collect_Points_Env_Cfg{A,B}
     number_outputs::Int64
     mazes::A
     agents::B
+
 end
 
-Adapt.@adapt_structure Collect_Points_Env_Cfg
+function CollectPoints(configuration::OrderedDict, number_individuals::Int)
 
+    CollectPoints(
+        configuration["maze_columns"],
+        configuration["maze_rows"],
+        convert(Int32, configuration["maze_cell_size"]),
+        configuration["agent_radius"],
+        convert(Int32, configuration["point_radius"]),
+        convert(Float32, configuration["agent_movement_range"]),
+        convert(Float32, configuration["reward_per_collected_positive_point"]),
+        convert(Float32, configuration["reward_per_collected_negative_point"]),
+        convert(Int32, configuration["number_time_steps"]),
+        10,
+        2,
+        CUDA.fill(1, (configuration["maze_rows"], configuration["maze_columns"], 4, number_individuals)),
+        CUDA.fill(0, (6, number_individuals)),
+    )
+end
+
+Adapt.@adapt_structure CollectPoints
 
 
 function place_agent_randomly_in_maze(environment_cfg)
@@ -44,21 +63,21 @@ function place_agent_randomly_in_maze(environment_cfg)
     return x_coordinate, y_coordinate
 end
 
-function get_memory_requirements(env_cfg::Collect_Points_Env_Cfg)
+function get_memory_requirements(env_cfg::CollectPoints)
     return sizeof(Int32) * (env_cfg.maze_columns * env_cfg.maze_rows * 6 + 10)
 end
 
-function get_number_inputs()
-    return 10
+function get_number_inputs(environments::CollectPoints)
+    return environments.number_inputs
 end
-function get_number_outputs()
-    return 2
+
+function get_number_outputs(environments::CollectPoints)
+    return environments.number_outputs
 end
+
 function get_observation(maze, input, environment_config_array, env_cfg)
-    cell_x =
-        convert(Int32, ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))
-    cell_y =
-        convert(Int32, ceil(@inbounds environment_config_array[2] / env_cfg.maze_cell_size))
+    cell_x = convert(Int32, ceil(@inbounds environment_config_array[1] / env_cfg.maze_cell_size))
+    cell_y = convert(Int32, ceil(@inbounds environment_config_array[2] / env_cfg.maze_cell_size))
     screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
     screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
 
@@ -144,31 +163,19 @@ function get_observation(maze, input, environment_config_array, env_cfg)
         sensor_distance
     end
 
-    @inbounds input[1] =
-        convert(Float32, @inbounds environment_config_array[1] / screen_width)
-    @inbounds input[2] =
-        convert(Float32, @inbounds environment_config_array[2] / screen_height)
-    @inbounds input[3] =
-        convert(Float32, @inbounds environment_config_array[3] / screen_width)
-    @inbounds input[4] =
-        convert(Float32, @inbounds environment_config_array[4] / screen_height)
-    @inbounds input[5] =
-        convert(Float32, @inbounds environment_config_array[5] / screen_width)
-    @inbounds input[6] =
-        convert(Float32, @inbounds environment_config_array[6] / screen_height)
+    @inbounds input[1] = convert(Float32, @inbounds environment_config_array[1] / screen_width)
+    @inbounds input[2] = convert(Float32, @inbounds environment_config_array[2] / screen_height)
+    @inbounds input[3] = convert(Float32, @inbounds environment_config_array[3] / screen_width)
+    @inbounds input[4] = convert(Float32, @inbounds environment_config_array[4] / screen_height)
+    @inbounds input[5] = convert(Float32, @inbounds environment_config_array[5] / screen_width)
+    @inbounds input[6] = convert(Float32, @inbounds environment_config_array[6] / screen_height)
     @inbounds input[7] = convert(Float32, sensor_north / screen_height)
     @inbounds input[8] = convert(Float32, sensor_east / screen_width)
     @inbounds input[9] = convert(Float32, sensor_south / screen_height)
     @inbounds input[10] = convert(Float32, sensor_west / screen_height)
 end
 
-function env_step(
-    maze,
-    action,
-    input,
-    environment_config_array,
-    env_cfg::Collect_Points_Env_Cfg,
-)
+function env_step(maze, action, input, environment_config_array, env_cfg::CollectPoints)
     screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
     screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
     @inbounds agent_x_coordinate =
@@ -352,7 +359,7 @@ function env_step(
     return rew
 end
 
-function create_maze(maze, env_cfg::Collect_Points_Env_Cfg, offset)
+function create_maze(maze, env_cfg::CollectPoints, offset)
     total_amount_of_cells = env_cfg.maze_columns * env_cfg.maze_rows
 
     x_coordinate_stack = @cuDynamicSharedMem(Int32, total_amount_of_cells, offset)
