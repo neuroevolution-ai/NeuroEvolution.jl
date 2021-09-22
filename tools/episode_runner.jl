@@ -1,68 +1,105 @@
-####Imports
 using CUDA
 using Random
-#include("brains/continuous_time_rnn.jl")
 
+function training_runs(individuals, number_individuals, brains, environments; env_seed::Int, number_rounds::Int, threads::Int, blocks::Int, shared_memory::Int)
+    
+    rewards = CUDA.fill(0.0f0, number_individuals)
+    
+    CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
+        individuals = CUDA.CuArray(individuals),
+        rewards = rewards,
+        environment_seeds = CUDA.fill(env_seed, number_individuals),
+        number_rounds = number_rounds,
+        brains = brains,
+        environments = environments,
+    )
 
-function kernel_eval_fitness(
-    individuals,
-    results,
-    env_seeds,
-    number_rounds,
-    brain_cfg::CTRNN_Cfg,
-    environment_cfg::Collect_Points_Env_Cfg,
-)
+    CUDA.synchronize()
+    
+    return Array(rewards)
+
+end
+
+function validation_runs(individual, individual_size, number_validation_runs, brains, environments; threads::Int, blocks::Int, shared_memory::Int)
+    
+    rewards = CUDA.fill(0.0f0, number_validation_runs)
+    
+    individuals = fill(0.0f0, number_validation_runs, individual_size)
+
+    for i = 1:number_validation_runs
+        for j = 1:individual_size
+            individuals[i, j] = individual[j]
+        end
+    end
+    
+    CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
+        individuals = CuArray(individuals),
+        rewards = rewards,
+        environment_seeds = CuArray(1:number_validation_runs),
+        number_rounds = 1,
+        brains = brains,
+        environments = environments,
+    )
+
+    CUDA.synchronize()
+
+    return Array(rewards)
+
+end
+
+function kernel_eval_fitness(;individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
+
     tx = threadIdx().x
     fitness_total = 0
 
     V = @cuDynamicSharedMem(
         Float32,
-        (brain_cfg.number_neurons, environment_cfg.number_inputs)
+        (brains.number_neurons, environments.number_inputs)
     )
     W = @cuDynamicSharedMem(
         Float32,
-        (brain_cfg.number_neurons, brain_cfg.number_neurons),
+        (brains.number_neurons, brains.number_neurons),
         sizeof(V)
     )
     T = @cuDynamicSharedMem(
         Float32,
-        (environment_cfg.number_outputs, brain_cfg.number_neurons),
+        (environments.number_outputs, brains.number_neurons),
         sizeof(V) + sizeof(W)
     )
 
     input = @cuDynamicSharedMem(
         Float32,
-        environment_cfg.number_inputs,
+        environments.number_inputs,
         sizeof(V) + sizeof(W) + sizeof(T)
     )
 
     sync_threads()
 
-    brain_initialize(tx, blockIdx().x, V, W, T, individuals,brain_cfg)
+    brain_initialize(tx, blockIdx().x, V, W, T, individuals,brains)
 
     sync_threads()
 
     x = @cuDynamicSharedMem(
         Float32,
-        brain_cfg.number_neurons,
+        brains.number_neurons,
         sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input)
     )
 
 
     temp_V = @cuDynamicSharedMem(
         Float32,
-        brain_cfg.number_neurons,
+        brains.number_neurons,
         sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input) + sizeof(x)
     )
     action = @cuDynamicSharedMem(
         Float32,
-        environment_cfg.number_outputs,
+        environments.number_outputs,
         sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input) + sizeof(temp_V) + sizeof(x)
     )
 
     maze = @cuDynamicSharedMem(
         Int32,
-        (environment_cfg.maze_columns, environment_cfg.maze_rows, 4),
+        (environments.maze_columns, environments.maze_rows, 4),
         sizeof(V) +
         sizeof(W) +
         sizeof(T) +
@@ -97,7 +134,7 @@ function kernel_eval_fitness(
     sync_threads()
     for j = 1:number_rounds
         if threadIdx().x == 1
-            @inbounds Random.seed!(Random.default_rng(), env_seeds[blockIdx().x] + j)
+            @inbounds Random.seed!(Random.default_rng(), environment_seeds[blockIdx().x] + j)
         end
         sync_threads()
         #reset brain
@@ -105,26 +142,26 @@ function kernel_eval_fitness(
         fitness_current = 0
 
         if tx == 1
-            create_maze(maze, environment_cfg, offset)
+            create_maze(maze, environments, offset)
         end
 
         #Place agent, positive_point, negative_point randomly in maze
         if tx == 1
             @inbounds environment_config_array[1], environment_config_array[2] =
-                place_agent_randomly_in_maze(environment_cfg)
+                place_agent_randomly_in_maze(environments)
         end
         if tx == 2
             @inbounds environment_config_array[3], environment_config_array[4] =
-                place_agent_randomly_in_maze(environment_cfg)
+                place_agent_randomly_in_maze(environments)
         end
         if tx == 3
             @inbounds environment_config_array[5], environment_config_array[6] =
-                place_agent_randomly_in_maze(environment_cfg)
+                place_agent_randomly_in_maze(environments)
         end
         sync_threads()
 
         if tx == 1
-            get_observation(maze, input, environment_config_array, environment_cfg)
+            get_observation(maze, input, environment_config_array, environments)
         end
 
         sync_threads()
@@ -132,12 +169,12 @@ function kernel_eval_fitness(
 
         #Loop through Timesteps
         #################################################
-        for index = 1:environment_cfg.number_time_steps
-            brain_step(tx,blockIdx().x,temp_V, V, W, T, x, input, action, brain_cfg)
+        for index = 1:environments.number_time_steps
+            brain_step(tx,blockIdx().x,temp_V, V, W, T, x, input, action, brains)
             sync_threads()
             if tx == 1
                 rew =
-                    env_step(maze, action, input, environment_config_array, environment_cfg)
+                    env_step(maze, action, input, environment_config_array, environments)
 
                 fitness_current += rew
             end
@@ -155,7 +192,7 @@ function kernel_eval_fitness(
     ######################################################
     #end of Round
     if tx == 1
-        @inbounds results[blockIdx().x] = fitness_total / number_rounds
+        @inbounds rewards[blockIdx().x] = fitness_total / number_rounds
     end
     sync_threads()
     return
