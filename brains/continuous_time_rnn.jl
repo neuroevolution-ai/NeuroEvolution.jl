@@ -235,28 +235,3 @@ function get_individual_size(brain_state)
     usage_dict = get_free_parameter_usage(brain_state)
     return sum_dict(usage_dict)
 end
-
-function get_max_pixel(i,threadID,input)
-    max_pixel = 0.0f0
-
-    #Fall threadID ungerade
-    if threadID % 2 == 1
-        max_pixel = max(input[i])
-    end
-
-    return max_pixel
-end
-
-
-function max_Pooling(input,result,pool_size)
-    if threadID <= size(result,2)
-
-        for i in 1:size(result,1)
-            @inbounds result[i,threadID] = 
-        end
-    end
-end
-
-
-a = CUDA.rand(Float32,(268,400))
-kernel_cpu = 

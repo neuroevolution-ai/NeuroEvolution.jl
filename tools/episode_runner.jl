@@ -4,14 +4,15 @@ using Random
 function training_runs(individuals, number_individuals, brains, environments; env_seed::Int, number_rounds::Int, threads::Int, blocks::Int, shared_memory::Int)
     
     rewards = CUDA.fill(0.0f0, number_individuals)
-    
+    individuals_gpu = CUDA.CuArray(individuals)
+    environment_seeds = CUDA.fill(env_seed, number_individuals)
     CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
-        individuals = CUDA.CuArray(individuals),
-        rewards = rewards,
-        environment_seeds = CUDA.fill(env_seed, number_individuals),
-        number_rounds = number_rounds,
-        brains = brains,
-        environments = environments,
+        individuals_gpu ,
+        rewards,
+        environment_seeds,
+        number_rounds,
+        brains,
+        environments
     )
 
     CUDA.synchronize()
@@ -31,14 +32,16 @@ function validation_runs(individual, individual_size, number_validation_runs, br
             individuals[i, j] = individual[j]
         end
     end
-    
+    individuals_gpu = CuArray(individuals)
+    environment_seeds = CuArray(1:number_validation_runs)
+    number_rounds = 1
     CUDA.@cuda threads = threads blocks = blocks shmem = shared_memory kernel_eval_fitness(
-        individuals = CuArray(individuals),
-        rewards = rewards,
-        environment_seeds = CuArray(1:number_validation_runs),
-        number_rounds = 1,
-        brains = brains,
-        environments = environments,
+        individuals_gpu,
+        rewards,
+        environment_seeds,
+        number_rounds,
+        brains,
+        environments
     )
 
     CUDA.synchronize()
@@ -47,7 +50,7 @@ function validation_runs(individual, individual_size, number_validation_runs, br
 
 end
 
-function kernel_eval_fitness(;individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
+function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
 
     tx = threadIdx().x
     fitness_total = 0
