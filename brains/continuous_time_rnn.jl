@@ -1,5 +1,6 @@
 using CUDA
 using Adapt
+using DataStructures
 
 @enum Dif_equation original separated
 
@@ -14,9 +15,12 @@ struct ContinuousTimeRNN{A,B}
     W::A
     T::A
     x::B
+    y::B
+    input_size::Int64
+    output_size::Int64
 end
 
-function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, number_individuals::Int)
+function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, number_outputs::Int, number_individuals::Int)
 
     ContinuousTimeRNN(
         convert(Float32, configuration["delta_t"]),
@@ -25,10 +29,14 @@ function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, numbe
         convert(Float32, configuration["clipping_range_min"]),
         convert(Float32, configuration["clipping_range_max"]),
         convert(Float32, configuration["alpha"]),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (number_inputs, configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)))
+        CUDA.fill(0.0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0, (number_outputs, configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0, (number_outputs, number_individuals)),
+        number_inputs,
+        number_outputs,
+    )
 end
 
 Adapt.@adapt_structure ContinuousTimeRNN
@@ -61,124 +69,92 @@ function custom_conv2(input, result, kernel)
 end
 
 
-function get_memory_requirements(number_inputs, number_outputs, brain_cfg::ContinuousTimeRNN)
-    return sizeof(Float32) * (
-        brain_cfg.number_neurons *
-        (brain_cfg.number_neurons + number_inputs + number_outputs + 2) +
-        number_inputs +
-        number_outputs
+function get_memory_requirements(brains::ContinuousTimeRNN)
+    return sizeof(Float32) * (brains.number_neurons * (brains.number_neurons + brains.number_inputs + brains.number_outputs + 2) +
+        brains.number_inputs +
+        brains.number_outputs
     )
 end
 
-function brain_initialize(threadID, blockID, V, W, T, individuals, brain_cfg::ContinuousTimeRNN)
-    number_neurons = size(W, 1)
-    input_size = size(V, 2)
-    output_size = size(T, 1)
-    v_size = input_size * number_neurons
-    w_size = number_neurons * number_neurons
+function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
+
+    v_size = brains.input_size * brains.number_neurons
+    w_size = brains.number_neurons * brains.number_neurons
+
     #initialize the brain_masks from the genome and set all Values on the diagonal of W negative
-    for i = 1:input_size
-        @inbounds V[threadID, i] = individuals[blockID, threadID+((i-1)*number_neurons)]
-        @inbounds brain_cfg.V[threadID, i, blockID] =
-            individuals[blockID, threadID+((i-1)*number_neurons)]
-    end
-    sync_threads()
-    for i = 1:number_neurons
-        @inbounds W[threadID, i] =
-            individuals[blockID, v_size+(threadID+((i-1)*number_neurons))]
-        @inbounds brain_cfg.W[threadID, i, blockID] =
-            individuals[blockID, v_size+(threadID+((i-1)*number_neurons))]
-    end
-    @inbounds W[threadID, threadID] = -abs(W[threadID, threadID])
-    @inbounds brain_cfg.W[threadID, threadID, blockID] = -abs(W[threadID, threadID])
-    for i = 1:output_size
-        @inbounds T[i, threadID] =
-            individuals[blockID, v_size+w_size+(i+((threadID-1)*output_size))]
-        @inbounds brain_cfg.T[i, threadID, blockID] =
-            individuals[blockID, v_size+w_size+(i+((threadID-1)*output_size))]
+    for i = 1:brains.input_size
+        @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID+((i-1)*brains.number_neurons)]
     end
 
-    return
+    sync_threads()
+
+    for i = 1:brains.number_neurons
+        @inbounds brains.W[threadID, i, blockID] = individuals[blockID, v_size+(threadID+((i-1)*brains.number_neurons))]
+    end
+
+    @inbounds brains.W[threadID, threadID, blockID] = -abs(brains.W[threadID, threadID, blockID])
+
+    for i = 1:brains.output_size
+        @inbounds brains.T[i, threadID, blockID] = individuals[blockID, v_size+w_size+(i+((threadID-1)*brains.output_size))]
+    end
+
 end
 
-function brain_step(
-    threadID,
-    blockID,
-    temp_V,
-    V,
-    W,
-    T,
-    x,
-    input,
-    action,
-    brain_cfg::ContinuousTimeRNN,
-)
+function reset(threadID, blockID, brains::ContinuousTimeRNN)
 
-    #treat image input as grey_scale
+    if threadID <= brains.number_neurons
+        @inbounds brains.x[threadID, blockID] = 0.0
+    end
 
-    input_size = size(V, 2)
-    output_size = size(T, 1)
-    if brain_cfg.differential_equation == original
-        if threadID <= size(W,2)
-            #V * input multiplication
-            V_value = 0.0f0
-            for i = 1:input_size
-                @inbounds V_value += V[threadID, i] * input[i]
-                #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
+end
+
+function step(threadID, blockID, input, brains::ContinuousTimeRNN)
+
+    if brains.differential_equation == separated
+        if threadID <= brains.number_neurons
+
+            # V_value = V * input (Matrix-Vector-Multiplication)
+            V_value = 0.0
+            for i = 1:brains.input_size
+                @inbounds V_value += (brains.V[threadID, i, blockID] * input[i, blockID])
             end
-            #
-            @inbounds temp_V[threadID] = tanh(x[threadID] + V_value)
-        
 
-            #W * result of Vmult
-            W_value = 0.0f0
-            for i = 1:brain_cfg.number_neurons
-                @inbounds W_value += W[threadID, i] * temp_V[i]
+            # W_value = W * tanh(x) (Matrix-Vector-Multiplication)
+            W_value = 0.0
+            for i = 1:brains.number_neurons
+                @inbounds W_value += (brains.W[threadID, i, blockID] * tanh(brains.x[i, blockID]))
             end
-            #
-            dx_dt = (-brain_cfg.alpha * x[threadID]) + W_value
+
+            sync_threads()
+
+            # Differential Equation
+            dx_dt = W_value + V_value
+
+            # Euler forward discretization
+            @inbounds brains.x[threadID, blockID] += brains.delta_t * dx_dt
+
+            # Clip x to state boundaries
+            @inbounds brains.x[threadID, blockID] = clamp(brains.x[threadID, blockID], brains.clipping_range_min, brains.clipping_range_max)
+
+            sync_threads()
+
         end
-    elseif brain_cfg.differential_equation == separated
-        if threadID <= size(W,2)
-            V_value = 0.0f0
-            for i = 1:input_size
-                @inbounds V_value += V[threadID, i] * input[i]
-                #@inbounds V_value += brain_cfg.V[threadID, i,blockID] * input[i]
+
+        if threadID <= brains.output_size
+
+            # T_value = T * x (Matrix-Vector-Multiplication)
+            T_value = 0.0
+            for i = 1:brains.number_neurons
+                T_value += brains.T[threadID, i, blockID] * brains.x[i, blockID]
             end
-            @inbounds temp_V[threadID] = V_value
-            W_value = 0.0f0
-            for i = 1:brain_cfg.number_neurons
-                @inbounds W_value += W[threadID, i] * tanh(x[i])
-                #@inbounds W_value += brain_cfg.W[threadID, i,blockID] * tanh(brain_cfg.x[i,blockID])
-            end
-            temp_V[threadID] += W_value
-            dx_dt = (-brain_cfg.alpha * x[threadID]) + temp_V[threadID]
-            #dx_dt2 = (-brain_cfg.alpha * brain_cfg.x[threadID,blockID]) + temp_V[threadID]
-    
+
+            # Calculate outputs
+            brains.y[threadID, blockID] = tanh(T_value)
+
+            sync_threads()
         end
     end
-    if threadID <= size(W,2)
-        @inbounds x[threadID] += (brain_cfg.delta_t * dx_dt)
-        @inbounds x[threadID] =
-        clamp(x[threadID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)
 
-        #@inbounds brain_cfg.x[threadID,blockID] += (brain_cfg.delta_t * dx_dt2)
-        #@inbounds brain_cfg.x[threadID,blockID] =
-        #clamp(brain_cfg.x[threadID,blockID], brain_cfg.clipping_range_min, brain_cfg.clipping_range_max)
-    end
-    sync_threads()
-
-    #T*temp_W matmul:
-    if threadID <= output_size
-        T_value = 0.0f0
-        for i = 1:brain_cfg.number_neurons
-            @inbounds T_value = T_value + T[threadID, i] * x[i]
-            #@inbounds T_value = T_value + brain_cfg.T[threadID, i,blockID] * brain_cfg.x[i,blockID]
-        end
-        @inbounds action[threadID] = tanh(T_value)
-    end
-    #
-    return
 end
 
 function get_masks_from_brain_state(brain_state::Dict) # what format for brain_state
@@ -195,8 +171,7 @@ end
 
 function generate_brain_state(input_size, output_size, configuration)
     v_mask = _generate_mask(configuration["number_neurons"], input_size)
-    w_mask =
-        _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
+    w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
     t_mask = _generate_mask(output_size, configuration["number_neurons"])
 
     return get_brain_state_from_masks(v_mask, w_mask, t_mask)
