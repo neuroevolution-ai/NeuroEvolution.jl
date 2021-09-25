@@ -55,11 +55,13 @@ end
 
             number_time_steps = 200
 
+            # Initialize brains 
+            brains = ContinuousTimeRNN(config_brain, number_inputs, number_outputs, number_individuals)
+
             # TODO: Refactor this
             individual_size = get_individual_size(generate_brain_state(number_inputs, number_outputs, config_brain))
 
-            # Initialize brains 
-            brains = ContinuousTimeRNN(config_brain, number_inputs, number_outputs, number_individuals)
+            @test individual_size == number_inputs * brains.number_neurons + brains.number_neurons * brains.number_neurons + number_outputs * brains.number_neurons
 
             v_size = brains.number_neurons * brains.input_size
             w_size = brains.number_neurons * brains.number_neurons
