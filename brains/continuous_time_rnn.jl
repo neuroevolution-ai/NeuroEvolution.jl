@@ -22,10 +22,16 @@ end
 
 function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, number_outputs::Int, number_individuals::Int)
 
+    if configuration["differential_equation"] == "separated"
+        differential_eq = separated
+    elseif configuration["differential_equation"] == "original"
+        differential_eq = original
+    end
+
     ContinuousTimeRNN(
         convert(Float32, configuration["delta_t"]),
         configuration["number_neurons"],
-        separated,
+        differential_eq,
         convert(Float32, configuration["clipping_range_min"]),
         convert(Float32, configuration["clipping_range_max"]),
         convert(Float32, configuration["alpha"]),
@@ -110,14 +116,19 @@ end
 
 function step(threadID, blockID, input, brains::ContinuousTimeRNN)
 
-    if brains.differential_equation == separated
-        if threadID <= brains.number_neurons
+    V_value = @cuDynamicSharedMem(Float32, brains.number_neurons)
 
-            # V_value = V * input (Matrix-Vector-Multiplication)
-            V_value = 0.0
-            for i = 1:brains.input_size
-                @inbounds V_value += (brains.V[threadID, i, blockID] * input[i, blockID])
-            end
+    if threadID <= brains.number_neurons
+
+        # V_value = V * input (Matrix-Vector-Multiplication)
+        V_value[threadID] = 0.0
+        for i = 1:brains.input_size
+            @inbounds V_value[threadID] += (brains.V[threadID, i, blockID] * input[i, blockID])
+        end
+
+        sync_threads()
+
+        if brains.differential_equation == separated
 
             # W_value = W * tanh(x) (Matrix-Vector-Multiplication)
             W_value = 0.0
@@ -128,31 +139,45 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             sync_threads()
 
             # Differential Equation
-            dx_dt = W_value + V_value
+            dx_dt = W_value + V_value[threadID]
 
-            # Euler forward discretization
-            @inbounds brains.x[threadID, blockID] += brains.delta_t * dx_dt
+        elseif brains.differential_equation == original
 
-            # Clip x to state boundaries
-            @inbounds brains.x[threadID, blockID] = clamp(brains.x[threadID, blockID], brains.clipping_range_min, brains.clipping_range_max)
-
-            sync_threads()
-
-        end
-
-        if threadID <= brains.output_size
-
-            # T_value = T * x (Matrix-Vector-Multiplication)
-            T_value = 0.0
+            # W_value = W * (tanh(x) + V_value) (Matrix-Vector-Multiplication)
+            W_value = 0.0
             for i = 1:brains.number_neurons
-                T_value += brains.T[threadID, i, blockID] * brains.x[i, blockID]
+                @inbounds W_value += (brains.W[threadID, i, blockID] * (tanh(brains.x[i, blockID] + V_value[i])))
             end
 
-            # Calculate outputs
-            brains.y[threadID, blockID] = tanh(T_value)
-
             sync_threads()
+
+            # Differential Equation
+            dx_dt = W_value
+
         end
+
+        # Euler forward discretization
+        @inbounds brains.x[threadID, blockID] += brains.delta_t * dx_dt
+
+        # Clip x to state boundaries
+        @inbounds brains.x[threadID, blockID] = clamp(brains.x[threadID, blockID], brains.clipping_range_min, brains.clipping_range_max)
+
+        sync_threads()
+
+    end
+
+    if threadID <= brains.output_size
+
+        # T_value = T * x (Matrix-Vector-Multiplication)
+        T_value = 0.0
+        for i = 1:brains.number_neurons
+            T_value += brains.T[threadID, i, blockID] * brains.x[i, blockID]
+        end
+
+        # Calculate outputs
+        brains.y[threadID, blockID] = tanh(T_value)
+
+        sync_threads()
     end
 
 end
