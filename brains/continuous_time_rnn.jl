@@ -10,6 +10,7 @@ struct ContinuousTimeRNN{A,B}
     differential_equation::Dif_equation
     clipping_range_min::Float32
     clipping_range_max::Float32
+    set_principle_diagonal_elements_of_W_negative::Bool
     alpha::Float32
     V::A
     W::A
@@ -34,6 +35,7 @@ function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, numbe
         differential_eq,
         convert(Float32, configuration["clipping_range_min"]),
         convert(Float32, configuration["clipping_range_max"]),
+        convert(Bool, configuration["set_principle_diagonal_elements_of_W_negative"]),
         convert(Float32, configuration["alpha"]),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
@@ -87,22 +89,25 @@ function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
     v_size = brains.input_size * brains.number_neurons
     w_size = brains.number_neurons * brains.number_neurons
 
-    #initialize the brain_masks from the genome and set all Values on the diagonal of W negative
     for i = 1:brains.input_size
         @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID+((i-1)*brains.number_neurons)]
     end
-
-    sync_threads()
 
     for i = 1:brains.number_neurons
         @inbounds brains.W[threadID, i, blockID] = individuals[blockID, v_size+(threadID+((i-1)*brains.number_neurons))]
     end
 
-    @inbounds brains.W[threadID, threadID, blockID] = -abs(brains.W[threadID, threadID, blockID])
+    sync_threads()
+
+    if brains.set_principle_diagonal_elements_of_W_negative == true
+        @inbounds brains.W[threadID, threadID, blockID] = -abs(brains.W[threadID, threadID, blockID])
+    end
 
     for i = 1:brains.output_size
         @inbounds brains.T[i, threadID, blockID] = individuals[blockID, v_size+w_size+(i+((threadID-1)*brains.output_size))]
     end
+
+    sync_threads()
 
 end
 
