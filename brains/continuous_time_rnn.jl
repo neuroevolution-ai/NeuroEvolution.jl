@@ -2,7 +2,7 @@ using CUDA
 using Adapt
 using DataStructures
 
-@enum Dif_equation original separated
+@enum Dif_equation LiHoChow2005 NaturalNet
 
 struct ContinuousTimeRNN{A,B}
     delta_t::Float32
@@ -22,10 +22,10 @@ end
 
 function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, number_outputs::Int, number_individuals::Int)
 
-    if configuration["differential_equation"] == "separated"
-        differential_eq = separated
-    elseif configuration["differential_equation"] == "original"
-        differential_eq = original
+    if configuration["differential_equation"] == "NaturalNet"
+        differential_eq = NaturalNet
+    elseif configuration["differential_equation"] == "LiHoChow2005"
+        differential_eq = LiHoChow2005
     end
 
     ContinuousTimeRNN(
@@ -128,7 +128,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
 
         sync_threads()
 
-        if brains.differential_equation == separated
+        if brains.differential_equation == NaturalNet
 
             # W_value = W * tanh(x) (Matrix-Vector-Multiplication)
             W_value = 0.0
@@ -141,7 +141,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             # Differential Equation
             dx_dt = -brains.alpha * brains.x[threadID, blockID] + W_value + V_value[threadID]
 
-        elseif brains.differential_equation == original
+        elseif brains.differential_equation == LiHoChow2005
 
             # W_value = W * (tanh(x) + V_value) (Matrix-Vector-Multiplication)
             W_value = 0.0

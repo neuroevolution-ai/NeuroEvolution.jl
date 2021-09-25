@@ -37,7 +37,7 @@ end
 
 @testset "Brain Continuous Time RNN" begin
 
-    for differential_eq in ["original", "separated"]
+    for differential_eq in ["LiHoChow2005", "NaturalNet"]
 
         config_brain = OrderedDict()
         config_brain["delta_t"] = 0.05
@@ -107,9 +107,9 @@ end
             for j = 1:number_individuals
 
                 # Differential Equation
-                if brains.differential_equation == separated
+                if brains.differential_equation == NaturalNet
                     dx_dt = -brains.alpha * x[:, j] + W[:, :, j] * map(tanh, x[:, j]) + V[:, :, j] * input[:, j]
-                elseif brains.differential_equation == original
+                elseif brains.differential_equation == LiHoChow2005
                     dx_dt = -brains.alpha * x[:, j] + W[:, :, j] * map(tanh, (x[:, j] + V[:, :, j] * input[:, j]))
                 end
 
