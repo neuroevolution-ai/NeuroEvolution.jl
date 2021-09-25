@@ -108,7 +108,7 @@ end
 
                 # Differential Equation
                 if config_brain["differential_equation"] == "separated"
-                    dx_dt = (W[:, :, j] * map(tanh, x[:, j])) + (V[:, :, j] * input[:, j])
+                    dx_dt = W[:, :, j] * map(tanh, x[:, j]) + V[:, :, j] * input[:, j]
                 elseif config_brain["differential_equation"] == "original"
                     dx_dt = W[:, :, j] * map(tanh, (x[:, j] + V[:, :, j] * input[:, j]))
                 end
