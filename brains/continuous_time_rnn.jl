@@ -139,7 +139,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             sync_threads()
 
             # Differential Equation
-            dx_dt = W_value + V_value[threadID]
+            dx_dt = -brains.alpha * brains.x[threadID, blockID] + W_value + V_value[threadID]
 
         elseif brains.differential_equation == original
 
@@ -152,7 +152,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             sync_threads()
 
             # Differential Equation
-            dx_dt = W_value
+            dx_dt = -brains.alpha * brains.x[threadID, blockID] + W_value
 
         end
 

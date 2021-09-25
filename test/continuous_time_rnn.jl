@@ -37,7 +37,7 @@ end
 
 @testset "Brain Continuous Time RNN" begin
 
-    for differential_eq = ["original", "separated"]
+    for differential_eq in ["original", "separated"]
 
         config_brain = OrderedDict()
         config_brain["delta_t"] = 0.05
@@ -46,7 +46,7 @@ end
         config_brain["clipping_range_min"] = -1.0
         config_brain["clipping_range_max"] = 1.0
         config_brain["set_principle_diagonal_elements_of_W_negative"] = true
-        config_brain["alpha"] = 0.0
+        config_brain["alpha"] = 0.1
 
         number_inputs = 30
         number_outputs = 15
@@ -108,9 +108,9 @@ end
 
                 # Differential Equation
                 if brains.differential_equation == separated
-                    dx_dt = W[:, :, j] * map(tanh, x[:, j]) + V[:, :, j] * input[:, j]
+                    dx_dt = -brains.alpha * x[:, j] + W[:, :, j] * map(tanh, x[:, j]) + V[:, :, j] * input[:, j]
                 elseif brains.differential_equation == original
-                    dx_dt = W[:, :, j] * map(tanh, (x[:, j] + V[:, :, j] * input[:, j]))
+                    dx_dt = -brains.alpha * x[:, j] + W[:, :, j] * map(tanh, (x[:, j] + V[:, :, j] * input[:, j]))
                 end
 
                 # Euler forward discretization
