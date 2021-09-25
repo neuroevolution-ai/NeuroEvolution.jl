@@ -107,9 +107,9 @@ end
             for j = 1:number_individuals
 
                 # Differential Equation
-                if config_brain["differential_equation"] == "separated"
+                if brains.differential_equation == separated
                     dx_dt = W[:, :, j] * map(tanh, x[:, j]) + V[:, :, j] * input[:, j]
-                elseif config_brain["differential_equation"] == "original"
+                elseif brains.differential_equation == original
                     dx_dt = W[:, :, j] * map(tanh, (x[:, j] + V[:, :, j] * input[:, j]))
                 end
 
