@@ -187,56 +187,20 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
 
 end
 
-function get_masks_from_brain_state(brain_state::Dict) # what format for brain_state
-    v_mask = get(brain_state, "v_mask", 1)
-    w_mask = get(brain_state, "w_mask", 1)
-    t_mask = get(brain_state, "t_mask", 1)
+function get_free_parameter_usage(brains)
 
-    return v_mask, w_mask, t_mask
+    usage_dict = Dict()
+
+    usage_dict["V"] = brains.input_size * brains.number_neurons
+    usage_dict["W"] = brains.number_neurons * brains.number_neurons
+    usage_dict["T"] = brains.number_neurons * brains.output_size
+
+    return usage_dict
 end
 
-function _generate_mask(n::Int, m::Int)
-    return trues(n, m)
-end
+function get_individual_size(brains)
 
-function generate_brain_state(input_size, output_size, configuration)
-    v_mask = _generate_mask(configuration["number_neurons"], input_size)
-    w_mask = _generate_mask(configuration["number_neurons"], configuration["number_neurons"])
-    t_mask = _generate_mask(output_size, configuration["number_neurons"])
-
-    return get_brain_state_from_masks(v_mask, w_mask, t_mask)
-end
-
-function get_brain_state_from_masks(v_mask, w_mask, t_mask)
-    return Dict("v_mask" => v_mask, "w_mask" => w_mask, "t_mask" => t_mask)
-end
-
-function get_free_parameter_usage(brain_state)
-    v_mask, w_mask, t_mask = get_masks_from_brain_state(brain_state)
-    #count true values
-    free_parameters_v = count(v_mask)
-    free_parameters_w = count(w_mask)
-    free_parameters_t = count(t_mask)
-
-    free_parameters =
-        Dict("V" => free_parameters_v, "W" => free_parameters_w, "T" => free_parameters_t)
-    return free_parameters
-end
-
-function sum_dict(node)
-    sum_ = 0
-    for (key, value) in node
-        if (value isa Dict)
-            sum_ += sum_dict(value)
-        else
-            sum_ += value
-        end
-
-    end
-    return sum_
-end
-
-function get_individual_size(brain_state)
-    usage_dict = get_free_parameter_usage(brain_state)
-    return sum_dict(usage_dict)
+    usage_dict = get_free_parameter_usage(brains)
+    
+    return usage_dict["V"] + usage_dict["W"] + usage_dict["T"]
 end
