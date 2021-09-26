@@ -126,8 +126,8 @@ end
                     # Calculate outputs
                     y = map(tanh, T[:, :, j] * x)
 
-                    @test x[:, j] ≈ Array(brains.x[:, j]) atol = 0.0001
-                    @test y[:, j] ≈ Array(brains.y[:, j]) atol = 0.0001
+                    @test x[:, j] ≈ Array(brains.x[:, j]) rtol = 0.0001
+                    @test y[:, j] ≈ Array(brains.y[:, j]) rtol = 0.0001
 
                 end
 
