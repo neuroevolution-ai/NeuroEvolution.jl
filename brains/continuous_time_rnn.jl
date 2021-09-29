@@ -162,7 +162,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # V_value = V * input (Matrix-Vector-Multiplication)
         V_value[threadID] = 0.0
         for i = 1:brains.input_size
-            @inbounds V_value[threadID] += (V[threadID, i] * input[i, blockID])
+            @inbounds V_value[threadID] += (V[threadID, i] * input[i])
         end
 
         sync_threads()
