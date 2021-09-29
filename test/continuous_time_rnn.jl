@@ -103,7 +103,7 @@ end
                 input = randn(number_inputs, number_individuals)
                 input_gpu = CuArray(input)
 
-                shared_memory = sizeof(Float32) * brains.number_neurons
+                shared_memory = get_memory_requirements(brains)
 
                 CUDA.@cuda threads = brains.number_neurons blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, brains)
                 CUDA.synchronize()

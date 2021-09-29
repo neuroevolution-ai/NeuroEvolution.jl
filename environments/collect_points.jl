@@ -175,18 +175,18 @@ function get_observation(maze, input, environment_config_array, env_cfg)
     @inbounds input[10] = convert(Float32, sensor_west / screen_height)
 end
 
-function env_step(maze, action, input, environment_config_array, env_cfg::CollectPoints)
+function env_step(threadID, blockID, maze, action, input, environment_config_array, env_cfg::CollectPoints)
     screen_width = env_cfg.maze_cell_size * env_cfg.maze_columns
     screen_height = env_cfg.maze_cell_size * env_cfg.maze_rows
     @inbounds agent_x_coordinate =
         environment_config_array[1] + clamp(
-            floor(action[1] * env_cfg.agent_movement_range),
+            floor(action[1, blockID] * env_cfg.agent_movement_range),
             -env_cfg.agent_movement_range,
             env_cfg.agent_movement_range,
         )
     @inbounds agent_y_coordinate =
         environment_config_array[2] + clamp(
-            floor(action[2] * env_cfg.agent_movement_range),
+            floor(action[2, blockID] * env_cfg.agent_movement_range),
             -env_cfg.agent_movement_range,
             env_cfg.agent_movement_range,
         )

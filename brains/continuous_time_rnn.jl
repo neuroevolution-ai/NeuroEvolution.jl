@@ -78,10 +78,7 @@ end
 
 
 function get_memory_requirements(brains::ContinuousTimeRNN)
-    return sizeof(Float32) * (brains.number_neurons * (brains.number_neurons + brains.number_inputs + brains.number_outputs + 2) +
-        brains.number_inputs +
-        brains.number_outputs
-    )
+    return sizeof(Float32) * brains.number_neurons
 end
 
 function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
@@ -201,6 +198,6 @@ end
 function get_individual_size(brains)
 
     usage_dict = get_free_parameter_usage(brains)
-    
+
     return usage_dict["V"] + usage_dict["W"] + usage_dict["T"]
 end
