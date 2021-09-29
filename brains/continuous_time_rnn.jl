@@ -78,7 +78,10 @@ end
 
 
 function get_memory_requirements(brains::ContinuousTimeRNN)
-    return sizeof(Float32) * (brains.number_neurons + brains.number_neurons * brains.input_size)
+    return sizeof(Float32) *
+           (brains.number_neurons + 
+           brains.number_neurons * brains.input_size + 
+           brains.number_neurons * brains.number_neurons)
 end
 
 function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
@@ -123,6 +126,9 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
     V = @cuDynamicSharedMem(Float32, (brains.number_neurons, brains.input_size), offset)
     offset += sizeof(V)
 
+    W = @cuDynamicSharedMem(Float32, (brains.number_neurons, brains.number_neurons), offset)
+    offset += sizeof(W)
+
     V_value = @cuDynamicSharedMem(Float32, brains.number_neurons, offset)
 
     if threadID <= brains.number_neurons
@@ -130,6 +136,11 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # Initialize V (shared memory)
         for i = 1:brains.input_size
             @inbounds V[threadID, i] = brains.V[threadID, i, blockID]
+        end
+
+        # Initialize W (shared memory)
+        for i = 1:brains.number_neurons
+            @inbounds W[threadID, i] = brains.W[threadID, i, blockID]
         end
 
         # V_value = V * input (Matrix-Vector-Multiplication)
@@ -145,7 +156,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             # W_value = W * tanh(x) (Matrix-Vector-Multiplication)
             W_value = 0.0
             for i = 1:brains.number_neurons
-                @inbounds W_value += (brains.W[threadID, i, blockID] * tanh(brains.x[i, blockID]))
+                @inbounds W_value += (W[threadID, i] * tanh(brains.x[i, blockID]))
             end
 
             sync_threads()
@@ -158,7 +169,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
             # W_value = W * (tanh(x) + V_value) (Matrix-Vector-Multiplication)
             W_value = 0.0
             for i = 1:brains.number_neurons
-                @inbounds W_value += (brains.W[threadID, i, blockID] * (tanh(brains.x[i, blockID] + V_value[i])))
+                @inbounds W_value += (W[threadID, i] * (tanh(brains.x[i, blockID] + V_value[i])))
             end
 
             sync_threads()
