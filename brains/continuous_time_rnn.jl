@@ -81,7 +81,8 @@ function get_memory_requirements(brains::ContinuousTimeRNN)
     return sizeof(Float32) *
            (brains.number_neurons + 
            brains.number_neurons * brains.input_size + 
-           brains.number_neurons * brains.number_neurons)
+           brains.number_neurons * brains.number_neurons +
+           brains.output_size * brains.number_neurons)
 end
 
 function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
@@ -129,6 +130,9 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
     W = @cuDynamicSharedMem(Float32, (brains.number_neurons, brains.number_neurons), offset)
     offset += sizeof(W)
 
+    T = @cuDynamicSharedMem(Float32, (brains.output_size, brains.number_neurons), offset)
+    offset += sizeof(T)
+
     V_value = @cuDynamicSharedMem(Float32, brains.number_neurons, offset)
 
     if threadID <= brains.number_neurons
@@ -141,6 +145,11 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # Initialize W (shared memory)
         for i = 1:brains.number_neurons
             @inbounds W[threadID, i] = brains.W[threadID, i, blockID]
+        end
+
+        # Initialize T (shared memory)
+        for i = 1:brains.output_size
+            @inbounds T[i, threadID] = brains.T[i, threadID, blockID]
         end
 
         # V_value = V * input (Matrix-Vector-Multiplication)
@@ -194,7 +203,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # T_value = T * x (Matrix-Vector-Multiplication)
         T_value = 0.0
         for i = 1:brains.number_neurons
-            T_value += brains.T[threadID, i, blockID] * brains.x[i, blockID]
+            T_value += T[threadID, i] * brains.x[i, blockID]
         end
 
         # Calculate outputs
