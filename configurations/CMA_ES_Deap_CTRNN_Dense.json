@@ -20,7 +20,7 @@
     "type": "CTRNN",
     "delta_t": 0.05,
     "number_neurons": 50,
-    "differential_equation": "separated",
+    "differential_equation": "NaturalNet",
     "clipping_range_min": -1.0,
     "clipping_range_max": 1.0,
     "set_principle_diagonal_elements_of_W_negative": true,
