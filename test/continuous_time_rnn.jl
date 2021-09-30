@@ -23,25 +23,35 @@ function kernel_test_initialize(individuals, brains)
 
 end
 
-function kernel_test_brain_step(input_all, brains)
+function kernel_test_brain_step(input_all, output_all, brains)
 
     tx = threadIdx().x
     bx = blockIdx().x
 
     offset = get_memory_requirements(brains)
+
     input = @cuDynamicSharedMem(Float32, brains.input_size, offset)
+    offset += sizeof(input)
+
+    output = @cuDynamicSharedMem(Float32, brains.output_size, offset)
 
     sync_threads()
 
+    # Load inputs to shared memory
     if tx <= brains.input_size
         input[tx] = input_all[tx, bx]
     end
 
     sync_threads()
 
-    step(tx, bx, input, brains)
+    step(tx, bx, input, output, brains)
 
     sync_threads()
+
+    # Load outputs from shared memory
+    if tx <= brains.output_size
+        output_all[tx, bx] = output[tx]
+    end
 
     return
 end
@@ -114,9 +124,12 @@ end
                 input = randn(number_inputs, number_individuals)
                 input_gpu = CuArray(input)
 
-                shared_memory = get_memory_requirements(brains) + sizeof(Float32) * brains.input_size
+                output = zeros(number_outputs, number_individuals)
+                output_gpu = CuArray(output)
 
-                CUDA.@cuda threads = brains.number_neurons blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, brains)
+                shared_memory = get_memory_requirements(brains) + sizeof(Float32) * (brains.input_size + brains.output_size)
+
+                CUDA.@cuda threads = brains.number_neurons blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, output_gpu, brains)
                 CUDA.synchronize()
 
                 for j = 1:number_individuals
@@ -138,7 +151,7 @@ end
                     y = map(tanh, T[:, :, j] * x)
 
                     @test x[:, j] ≈ Array(brains.x[:, j]) rtol = 0.001
-                    @test y[:, j] ≈ Array(brains.y[:, j]) rtol = 0.001
+                    @test y[:, j] ≈ Array(output_gpu[:, j]) rtol = 0.001
 
                 end
 

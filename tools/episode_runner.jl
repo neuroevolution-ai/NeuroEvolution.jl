@@ -118,11 +118,11 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
         #Loop through Timesteps
         #################################################
         for index = 1:environments.number_time_steps
-            step(tx, bx, input, brains)
+            step(tx, bx, input, action, brains)
 
             sync_threads()
             if tx == 1
-                rew = env_step(tx, bx, maze, brains.y, input, environment_config_array, environments)
+                rew = env_step(tx, bx, maze, action, input, environment_config_array, environments)
             
                 fitness_current += rew
             end

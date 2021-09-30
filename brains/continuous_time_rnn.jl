@@ -16,7 +16,6 @@ struct ContinuousTimeRNN{A,B}
     W::A
     T::A
     x::B
-    y::B
     input_size::Int64
     output_size::Int64
 end
@@ -41,7 +40,6 @@ function ContinuousTimeRNN(configuration::OrderedDict, number_inputs::Int, numbe
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (number_outputs, configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
         number_inputs,
         number_outputs,
     )
@@ -121,7 +119,7 @@ function reset(threadID, blockID, brains::ContinuousTimeRNN)
 
 end
 
-function step(threadID, blockID, input, brains::ContinuousTimeRNN)
+function step(threadID, blockID, input, action, brains::ContinuousTimeRNN)
 
     offset = 0
 
@@ -214,7 +212,7 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         end
 
         # Calculate outputs
-        brains.y[threadID, blockID] = tanh(T_value)
+        action[threadID] = tanh(T_value)
 
     end
 
