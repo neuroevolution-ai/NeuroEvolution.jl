@@ -23,10 +23,21 @@ function kernel_test_initialize(individuals, brains)
 
 end
 
-function kernel_test_brain_step(input, brains)
+function kernel_test_brain_step(input_all, brains)
 
     tx = threadIdx().x
     bx = blockIdx().x
+
+    offset = get_memory_requirements(brains)
+    input = @cuDynamicSharedMem(Float32, brains.input_size, offset)
+
+    sync_threads()
+
+    if tx <= brains.input_size
+        input[tx] = input_all[tx, bx]
+    end
+
+    sync_threads()
 
     step(tx, bx, input, brains)
 
@@ -103,7 +114,7 @@ end
                 input = randn(number_inputs, number_individuals)
                 input_gpu = CuArray(input)
 
-                shared_memory = get_memory_requirements(brains)
+                shared_memory = get_memory_requirements(brains) + sizeof(Float32) * brains.input_size
 
                 CUDA.@cuda threads = brains.number_neurons blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, brains)
                 CUDA.synchronize()

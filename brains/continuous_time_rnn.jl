@@ -201,9 +201,9 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # Clip x to state boundaries
         @inbounds brains.x[threadID, blockID] = clamp(brains.x[threadID, blockID], brains.clipping_range_min, brains.clipping_range_max)
 
-        sync_threads()
-
     end
+
+    sync_threads()
 
     if threadID <= brains.output_size
 
@@ -216,8 +216,9 @@ function step(threadID, blockID, input, brains::ContinuousTimeRNN)
         # Calculate outputs
         brains.y[threadID, blockID] = tanh(T_value)
 
-        sync_threads()
     end
+
+    sync_threads()
 
 end
 
