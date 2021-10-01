@@ -53,95 +53,40 @@ end
 function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
 
     tx = threadIdx().x
+    bx = blockIdx().x
+
     fitness_total = 0
 
-    V = @cuDynamicSharedMem(
-        Float32,
-        (brains.number_neurons, environments.number_inputs)
-    )
-    W = @cuDynamicSharedMem(
-        Float32,
-        (brains.number_neurons, brains.number_neurons),
-        sizeof(V)
-    )
-    T = @cuDynamicSharedMem(
-        Float32,
-        (environments.number_outputs, brains.number_neurons),
-        sizeof(V) + sizeof(W)
-    )
-
-    input = @cuDynamicSharedMem(
-        Float32,
-        environments.number_inputs,
-        sizeof(V) + sizeof(W) + sizeof(T)
-    )
+    initialize(tx, bx, individuals, brains)
+    offset = get_memory_requirements(brains)
 
     sync_threads()
 
-    brain_initialize(tx, blockIdx().x, V, W, T, individuals,brains)
+    input = @cuDynamicSharedMem(Float32, environments.number_inputs, offset)
+    offset += sizeof(input)
 
     sync_threads()
 
-    x = @cuDynamicSharedMem(
-        Float32,
-        brains.number_neurons,
-        sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input)
-    )
+    action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset)
+    offset += sizeof(action)
 
-
-    temp_V = @cuDynamicSharedMem(
-        Float32,
-        brains.number_neurons,
-        sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input) + sizeof(x)
-    )
-    action = @cuDynamicSharedMem(
-        Float32,
-        environments.number_outputs,
-        sizeof(V) + sizeof(W) + sizeof(T) + sizeof(input) + sizeof(temp_V) + sizeof(x)
-    )
-
-    maze = @cuDynamicSharedMem(
-        Int32,
-        (environments.maze_columns, environments.maze_rows, 4),
-        sizeof(V) +
-        sizeof(W) +
-        sizeof(T) +
-        sizeof(input) +
-        sizeof(temp_V) +
-        sizeof(x) +
-        sizeof(action)
-    )
-    environment_config_array = @cuDynamicSharedMem(
-        Int32,
-        6,
-        sizeof(V) +
-        sizeof(W) +
-        sizeof(T) +
-        sizeof(input) +
-        sizeof(temp_V) +
-        sizeof(x) +
-        sizeof(action) +
-        sizeof(maze)
-    )
-    offset =
-        sizeof(V) +
-        sizeof(W) +
-        sizeof(T) +
-        sizeof(input) +
-        sizeof(temp_V) +
-        sizeof(x) +
-        sizeof(action) +
-        sizeof(maze) +
-        sizeof(environment_config_array)
+    maze = @cuDynamicSharedMem(Int32, (environments.maze_columns, environments.maze_rows, 4), offset)
+    offset += sizeof(maze)
+    
+    environment_config_array = @cuDynamicSharedMem(Int32, 6, offset)
+    offset += sizeof(environment_config_array)
 
     sync_threads()
+
     for j = 1:number_rounds
+
         if threadIdx().x == 1
             @inbounds Random.seed!(Random.default_rng(), environment_seeds[blockIdx().x] + j)
         end
+        
         sync_threads()
-        #reset brain
-        @inbounds x[tx] = 0.0f0
+        
+        reset(tx, bx, brains)
         fitness_current = 0
 
         if tx == 1
@@ -173,12 +118,12 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
         #Loop through Timesteps
         #################################################
         for index = 1:environments.number_time_steps
-            brain_step(tx,blockIdx().x,temp_V, V, W, T, x, input, action, brains)
+            step(tx, bx, input, action, brains)
+
             sync_threads()
             if tx == 1
-                rew =
-                    env_step(maze, action, input, environment_config_array, environments)
-
+                rew = env_step(maze, action, input, environment_config_array, environments)
+            
                 fitness_current += rew
             end
             sync_threads()

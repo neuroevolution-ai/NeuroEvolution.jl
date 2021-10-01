@@ -66,12 +66,9 @@ function main()
     number_outputs = get_number_outputs(environments)
 
     # Initialize brains 
-    brains = brain_type(config.brain, number_inputs, number_individuals)
+    brains = brain_type(config.brain, number_inputs, number_outputs, number_individuals)
 
-    # TODO: Refactor this
-    individual_size = get_individual_size(
-        generate_brain_state(number_inputs, number_outputs, config.brain),
-    )
+    individual_size = get_individual_size(brains)
 
     # Initialize optimizer
     optimizer = optimizer_type(individual_size, config.optimizer)
@@ -81,7 +78,7 @@ function main()
 
     required_shared_memory =
         sizeof(Int32) +
-        get_memory_requirements(number_inputs, number_outputs, brains) +
+        get_memory_requirements(brains) +
         get_memory_requirements(environments)
 
     # Get start time of training and date
