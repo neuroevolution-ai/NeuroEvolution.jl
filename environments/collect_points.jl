@@ -401,6 +401,72 @@ function env_step(threadID, blockID, input, action, environments::CollectPoints)
     return rew
 end
 
+function render(environments::CollectPoints)
+    
+    # White white background
+    background("white")
+
+    # Draw agent
+    sethue("green")
+    agent_position = Array(environments.agents_positions[:,1])
+    circle(agent_position[1], agent_position[2], environments.agent_radius, :fill)
+
+    # Draw positive point
+    sethue("blue")
+    positive_points_position = Array(environments.positive_points_positions[:,1])
+    circle(positive_points_position[1], positive_points_position[2], environments.point_radius, :fill)
+
+    # Draw negative point
+    sethue("red")
+    negative_points_position = Array(environments.negative_points_positions[:,1])
+    circle(negative_points_position[1], negative_points_position[2], environments.point_radius, :fill)
+
+    # Draw maze
+    sethue("black")
+    setline(2)
+    maze_walls_north = Array(environments.mazes[:,:,1,1])
+    maze_walls_east = Array(environments.mazes[:,:,2,1])
+    maze_walls_south = Array(environments.mazes[:,:,3,1])
+    maze_walls_west = Array(environments.mazes[:,:,4,1])
+    
+    for cell_x = 1:environments.maze_columns
+        for cell_y in 1:environments.maze_rows
+
+            x_left, x_right, y_top, y_bottom = get_coordinates_maze_cell(cell_x, cell_y, environments.maze_cell_size)
+
+            # Draw walls
+            if maze_walls_north[cell_x, cell_y] == 0
+                line(Point(x_left, y_top), Point(x_right, y_top), :stroke)
+            end
+
+            if maze_walls_south[cell_x, cell_y] == 0
+                line(Point(x_left, y_bottom), Point(x_right, y_bottom), :stroke)
+            end
+
+            if maze_walls_east[cell_x, cell_y] == 0
+                line(Point(x_right, y_top), Point(x_right, y_bottom), :stroke)
+            end
+
+            if maze_walls_west[cell_x, cell_y] == 0
+                line(Point(x_left, y_top), Point(x_left, y_bottom), :stroke)
+            end
+
+        end
+    end
+end
+
+function get_coordinates_maze_cell(cell_x::Int, cell_y::Int, maze_cell_size::Int32)
+
+    x_left = maze_cell_size * (cell_x - 1)
+    x_right = maze_cell_size * cell_x
+    y_top = maze_cell_size * (cell_y - 1)
+    y_bottom = maze_cell_size * cell_y
+
+    return x_left, x_right, y_top, y_bottom
+    
+end
+
+
 function create_maze(threadID, blockID, environments::CollectPoints, offset)
 
     total_amount_of_cells = environments.maze_columns * environments.maze_rows
