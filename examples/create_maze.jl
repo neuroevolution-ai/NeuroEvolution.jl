@@ -48,7 +48,7 @@ function find_valid_neighbours(maze::Matrix{Cell}, cell::Cell)
     neighbours = []
 
     nx, ny = size(maze)
-    maze
+
     for (direction, (dx, dy)) in delta
 
         x2, y2 = cell.x + dx, cell.y + dy
