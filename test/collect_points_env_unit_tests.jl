@@ -40,7 +40,7 @@ end
 
     environments = CollectPoints(config_environment, number_individuals)
 
-    shared_memory = get_memory_requirements(environments)
+    shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs
 
     CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed)
 
