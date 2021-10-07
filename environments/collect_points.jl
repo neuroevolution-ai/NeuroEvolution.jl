@@ -19,6 +19,7 @@ struct CollectPoints{A,B}
     maze_walls_east::A
     maze_walls_south::A
     maze_walls_west::A
+    maze_randoms::B
     agents_positions::B
     positive_points_positions::B
     negative_points_positions::B
@@ -43,6 +44,7 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
         CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
         CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
+        CUDA.fill(0, (configuration["maze_columns"] * configuration["maze_rows"], number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
@@ -499,6 +501,9 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset)
         k = rand(1:number_neighbours)
         next_cell_x = neighbours[k, 1]
         next_cell_y = neighbours[k, 2]
+
+        # Store chosen random value to enable unit test for the create_maze function
+        environments.maze_randoms[nv, blockID] = k
 
         # Knock down the wall between current_cell and next_cell
         knock_down_wall(blockID, current_cell_x, current_cell_y, next_cell_x, next_cell_y, environments)

@@ -2,6 +2,8 @@
 # https://scipython.com/blog/making-a-maze/
 # Christian Hill, April 2017.
 
+using DataStructures
+
 @enum Direction North South East West
 
 # A cell in the maze.
@@ -37,7 +39,7 @@ end
 # Return a list of unvisited neighbours to cell
 function find_valid_neighbours(maze::Matrix{Cell}, cell::Cell)
 
-    delta = Dict(West => [-1 0], East => [1 0], South => [0 1], North => [0 -1])
+    delta = OrderedDict(West => [-1 0], East => [1 0], South => [0 1], North => [0 -1])
 
     neighbours = []
 
@@ -58,7 +60,7 @@ function find_valid_neighbours(maze::Matrix{Cell}, cell::Cell)
     return neighbours
 end
 
-function make_maze(nx::Int, ny::Int)
+function make_maze(nx::Int, ny::Int, randoms)
 
     # Total number of cells.
     n = nx * ny
@@ -81,7 +83,7 @@ function make_maze(nx::Int, ny::Int)
         end
 
         # Choose a random neighbouring cell and move to it.
-        k = rand(1:length(neighbours))
+        k = randoms[nv]
         direction, next_cell = neighbours[k]
         knock_down_wall(current_cell, next_cell, direction)
         push!(cell_stack, current_cell)
