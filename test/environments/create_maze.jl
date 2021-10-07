@@ -60,7 +60,7 @@ function find_valid_neighbours(maze::Matrix{Cell}, cell::Cell)
     return neighbours
 end
 
-function make_maze(nx::Int, ny::Int, randoms)
+function make_maze(nx::Int, ny::Int, randoms=nothing)
 
     # Total number of cells.
     n = nx * ny
@@ -83,7 +83,12 @@ function make_maze(nx::Int, ny::Int, randoms)
         end
 
         # Choose a random neighbouring cell and move to it.
-        k = randoms[nv]
+        if randoms === nothing
+            k = rand(1:length(neighbours))
+        else
+            k = randoms[nv]
+        end
+
         direction, next_cell = neighbours[k]
         knock_down_wall(current_cell, next_cell, direction)
         push!(cell_stack, current_cell)
