@@ -404,7 +404,7 @@ end
 
 function render(environments::CollectPoints)
 
-    # White white background
+    # Draw white background
     background("white")
 
     # Draw agent
