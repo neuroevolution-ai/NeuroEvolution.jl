@@ -1,0 +1,34 @@
+{
+  "number_generations": 2500,
+  "number_validation_runs": 100,
+  "number_rounds": 20,
+  "maximum_env_seed": 100000,
+  "environment": {
+    "type": "CollectPoints",
+    "maze_columns": 5,
+    "maze_rows": 5,
+    "maze_cell_size": 80,
+    "agent_radius": 12,
+    "point_radius": 8,
+    "agent_movement_range": 10.0,
+    "use_sensors": true,
+    "reward_per_collected_positive_point": 500.0,
+    "reward_per_collected_negative_point": -700.0,
+    "number_time_steps": 1000
+  },
+  "brain": {
+    "type": "CTRNN",
+    "delta_t": 0.05,
+    "number_neurons": 50,
+    "differential_equation": "LiHoChow2005",
+    "clipping_range_min": -1.0,
+    "clipping_range_max": 1.0,
+    "set_principle_diagonal_elements_of_W_negative": true,
+    "alpha": 0.0
+  },
+  "optimizer": {
+    "type": "CMA-ES-Deap",
+    "population_size": 112,
+    "sigma": 1.0
+  }
+}
