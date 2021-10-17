@@ -2,7 +2,7 @@ using CUDA
 using Adapt
 using StructArrays
 using Images
-using ImageView
+#using ImageView
 using Random
 using Test
 include("../util/Matrix_utils.jl")
@@ -313,17 +313,17 @@ CUDA.synchronize()
 
 
 
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,1])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,1])))
 
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,2])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,3])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,4])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,5])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,6])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,7])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,8])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,9])))
-imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,10])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,2])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,3])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,4])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,5])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,6])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,7])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,8])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,9])))
+#imshow(colorview(RGB,Array(env.frame_buffer[:,:,:,10])))
 
 
 
