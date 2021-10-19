@@ -5,7 +5,14 @@
 ## Quick start
 
 1. The NeuroEvolution.jl framework uses the CUDA.jl package, install this package first and make sure it is working: https://cuda.juliagpu.org/stable/
-2. Execute the `train.jl` to start the training.
+2. Instantiate the packages required by this repository as defined in the Project.toml by the following steps:
+    - In a terminal navigate to this folder (containing the Project.toml)
+    - Execute `julia --project=.` to start a julia REPL
+    - Then, go to package mode by entering the ]
+    - Execute the `instantiate` command
+    - After all packages have been instantiated, leave package mode by hitting backspace or ctrl-C
+    - Leave julia REPL with ctrl-D
+3. Execute `julia --project=. train.jl` to start the training.
 
 ## Running the unit tests
 
