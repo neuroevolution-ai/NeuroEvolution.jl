@@ -1,7 +1,10 @@
-using Luxor
+using Test
+using Random
 
-include("environments/collect_points.jl")
-include("tools/play.jl")
+
+include("../environments/collect_points.jl")
+include("environments/create_maze.jl")
+
 
 function kernel_test_initialize(environments, env_seed)
 
@@ -19,7 +22,7 @@ function kernel_test_initialize(environments, env_seed)
 end
 
 
-function main()
+@testset "Collect Points" begin
 
     config_environment = OrderedDict()
     config_environment["maze_columns"] = 5
@@ -44,17 +47,28 @@ function main()
 
     CUDA.synchronize()
 
-    println(environments.agents_positions[:,1])
+    maze_walls_west_cpu = Array(environments.maze_walls_west)
+    maze_walls_east_cpu = Array(environments.maze_walls_east)
+    maze_walls_south_cpu = Array(environments.maze_walls_south)
+    maze_walls_north_cpu = Array(environments.maze_walls_north)
 
-    width = environments.maze_cell_size * environments.maze_columns
-    height = environments.maze_cell_size * environments.maze_rows
-    number_iterations = 100
+    for i = 1:number_individuals
 
-    @play width height number_iterations begin
-        render(environments)
+        maze = make_maze(environments.maze_columns, environments.maze_rows, Array(environments.maze_randoms[:, i]))
+
+        for x = 1:environments.maze_columns
+            for y = 1:environments.maze_rows
+
+                @test maze[x, y].walls[West] == maze_walls_west_cpu[x, y, i]
+                @test maze[x, y].walls[East] == maze_walls_east_cpu[x, y, i]
+                @test maze[x, y].walls[South] == maze_walls_south_cpu[x, y, i]
+                @test maze[x, y].walls[North] == maze_walls_north_cpu[x, y, i]
+
+            end
+        end
+
     end
 
 end
 
-
-main()
+println("Finished")
