@@ -56,9 +56,7 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     bx = blockIdx().x
 
     fitness_total = 0
-
-    initialize(tx, bx, individuals, brains)
-    offset = get_memory_requirements(brains)
+    offset = 0
 
     sync_threads()
 
@@ -70,78 +68,7 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset)
     offset += sizeof(action)
 
-    maze = @cuDynamicSharedMem(Int32, (environments.maze_columns, environments.maze_rows, 4), offset)
-    offset += sizeof(maze)
-    
-    environment_config_array = @cuDynamicSharedMem(Int32, 6, offset)
-    offset += sizeof(environment_config_array)
+    # TODO
 
-    sync_threads()
-
-    for j = 1:number_rounds
-
-        if threadIdx().x == 1
-            @inbounds Random.seed!(Random.default_rng(), environment_seeds[blockIdx().x] + j)
-        end
-        
-        sync_threads()
-        
-        reset(tx, bx, brains)
-        fitness_current = 0
-
-        if tx == 1
-            create_maze(maze, environments, offset)
-        end
-
-        #Place agent, positive_point, negative_point randomly in maze
-        if tx == 1
-            @inbounds environment_config_array[1], environment_config_array[2] =
-                place_agent_randomly_in_maze(environments)
-        end
-        if tx == 2
-            @inbounds environment_config_array[3], environment_config_array[4] =
-                place_agent_randomly_in_maze(environments)
-        end
-        if tx == 3
-            @inbounds environment_config_array[5], environment_config_array[6] =
-                place_agent_randomly_in_maze(environments)
-        end
-        sync_threads()
-
-        if tx == 1
-            get_observation(maze, input, environment_config_array, environments)
-        end
-
-        sync_threads()
-
-
-        #Loop through Timesteps
-        #################################################
-        for index = 1:environments.number_time_steps
-            step(tx, bx, input, action, brains)
-
-            sync_threads()
-            if tx == 1
-                rew = env_step(maze, action, input, environment_config_array, environments)
-            
-                fitness_current += rew
-            end
-            sync_threads()
-        end
-
-        ####################################################
-        #end of Timestep
-        if tx == 1
-            fitness_total += fitness_current
-        end
-        sync_threads()
-
-    end
-    ######################################################
-    #end of Round
-    if tx == 1
-        @inbounds rewards[blockIdx().x] = fitness_total / number_rounds
-    end
-    sync_threads()
     return
 end
