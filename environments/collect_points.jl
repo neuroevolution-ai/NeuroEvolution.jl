@@ -2,6 +2,7 @@ using CUDA
 using Adapt
 using DataStructures
 using Random
+using Distributions
 
 struct CollectPoints{A,B}
     maze_columns::Int64
@@ -40,10 +41,10 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Int32, configuration["number_time_steps"]),
         10,
         2,
-        CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
-        CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
-        CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
-        CUDA.fill(true, (configuration["maze_columns"], configuration["maze_rows"], number_individuals)),
+        CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
+        CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
+        CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
+        CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
         CUDA.fill(0, (configuration["maze_columns"] * configuration["maze_rows"], number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
@@ -60,12 +61,83 @@ function initialize(threadID, blockID, input, environments::CollectPoints, offse
     if threadID == 1
         Random.seed!(Random.default_rng(), env_seed)
         create_maze(threadID, blockID, environments, offset)
+        environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
+        environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = environments.agents_positions[1, blockID] + 20, environments.agents_positions[2, blockID] + 20
+        environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
     end
 
     return
 
 end
 
+function step(blockID, environments::CollectPoints)
+
+    action = rand(Uniform(-1.0, 1.0), 2)
+    move_range = environments.agent_movement_range
+    maze_width = environments.maze_cell_size * environments.maze_rows
+    maze_heigth = environments.maze_cell_size * environments.maze_columns
+
+    #Copying to CPU due to scalar indexing
+    agent_position = Array(environments.agents_positions[:, blockID])
+    maze_wall_north = Array(environments.maze_walls_north[:,:,blockID])
+    maze_wall_south = Array(environments.maze_walls_south[:,:,blockID])
+    maze_wall_west = Array(environments.maze_walls_west[:,:,blockID])
+    maze_wall_east = Array(environments.maze_walls_east[:,:,blockID])
+    positive_point = Array(environments.positive_points_positions[:,blockID])
+    negative_point = Array(environments.negative_points_positions[:,blockID])
+
+    
+    # Move agent
+    agent_position[1] += convert(Int, round(clamp(action[1] * move_range, -move_range, move_range)))
+    agent_position[2] += convert(Int, round(clamp(action[2] * move_range, -move_range, move_range)))
+
+    agent_position[2] = max(agent_position[2], environments.agent_radius)  # Upper border
+    agent_position[2] = min(agent_position[2], maze_heigth - environments.agent_radius)  # Lower bord.
+    agent_position[1] = min(agent_position[1], maze_width - environments.agent_radius)  # Right border
+    agent_position[1] = max(agent_position[1], environments.agent_radius)  # Left border
+
+    #Cell indices of current agent position
+    cell_x = convert(Int, ceil(agent_position[1] / environments.maze_cell_size))
+    cell_y = convert(Int, ceil(agent_position[2] / environments.maze_cell_size))
+
+    #walls of current cell
+    cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(cell_x, cell_y, environments.maze_cell_size)
+
+    # Check maze wall collision
+    if maze_wall_north[cell_x, cell_y]
+        agent_position[2] = max(agent_position[2], environments.agent_radius + cell_top)
+    end
+    if maze_wall_south[cell_x, cell_y]
+        agent_position[2] = min(agent_position[2], cell_bottom - environments.agent_radius)
+    end
+    if maze_wall_east[cell_x, cell_y]
+        agent_position[1] = min(agent_position[1], cell_right - environments.agent_radius)
+    end
+    if maze_wall_west[cell_x, cell_y]
+        agent_position[1] = max(agent_position[1], cell_left + environments.agent_radius)
+    end
+
+    reward = 0.0
+
+    # Collect positive point in reach
+    distance = sqrt((positive_point[1] - agent_position[1])^2 + (positive_point[2] - agent_position[2])^2)
+    if distance <= environments.point_radius + environments.agent_radius
+        positive_point[1], positive_point[2] = place_randomly_in_maze(blockID, environments)
+        reward += environments.reward_per_collected_positive_point
+    end
+
+    # Collect negative point in reach
+    distance = sqrt((negative_point[1] - agent_position[1])^2 + (negative_point[2] - agent_position[2])^2)
+    if distance <= environments.point_radius + environments.agent_radius
+        negative_point[1], negative_point[2] = place_randomly_in_maze(blockID, environments)
+        reward += environments.reward_per_collected_negative_point
+    end
+    println(reward)
+    environments.positive_points_positions[:, blockID] = positive_point
+    environments.negative_points_positions[:, blockID] = negative_point
+    environments.agents_positions[:, blockID] = agent_position
+
+end
 
 function get_memory_requirements(environments::CollectPoints)
     total_amount_of_cells = environments.maze_columns * environments.maze_rows
@@ -134,6 +206,7 @@ function render(environments::CollectPoints)
 
         end
     end
+    sleep(0.05)
 end
 
 function get_coordinates_maze_cell(cell_x::Int, cell_y::Int, maze_cell_size::Int32)
@@ -308,4 +381,15 @@ function knock_down_wall(blockID, cell1_x, cell1_y, cell2_x, cell2_y, environmen
         end
 
     end
+end
+
+function place_randomly_in_maze(blockID, environments::CollectPoints)
+
+    x_position = rand(1:environments.maze_rows) * environments.maze_cell_size
+    y_position = rand(1:environments.maze_columns) * environments.maze_cell_size
+
+    x_position += rand(environments.agent_radius:environments.maze_cell_size-environments.agent_radius)
+    y_position += rand(environments.agent_radius:environments.maze_cell_size-environments.agent_radius)
+
+    return x_position, y_position
 end
