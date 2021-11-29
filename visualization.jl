@@ -44,13 +44,17 @@ function main()
 
     CUDA.synchronize()
 
-    println(environments.agents_positions[:,1])
+    println("AGENT POSITION: ", environments.agents_positions[:, 1])
+    println("POSITIVE POINTS: ", environments.positive_points_positions[:, 1])
+    println("NEGATIVE POINTS: ", environments.negative_points_positions[:, 1])
+
 
     width = environments.maze_cell_size * environments.maze_columns
     height = environments.maze_cell_size * environments.maze_rows
-    number_iterations = 100
+    number_iterations = 1000
 
     @play width height number_iterations begin
+        step(1, environments)
         render(environments)
     end
 
