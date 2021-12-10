@@ -18,6 +18,19 @@ function kernel_test_initialize(environments, env_seed)
     return
 end
 
+function kernel_test_collect_points(action, environments, env_seed)
+
+    tx = threadIdx().x
+    bx = blockIdx().x
+
+    input = @cuDynamicSharedMem(Float32, environments.number_inputs)
+    offset = sizeof(input)
+    sync_threads()
+    step(tx, bx, action, offset, environments)
+
+    return
+end
+
 
 function main()
 
@@ -49,15 +62,21 @@ function main()
     println("NEGATIVE POINTS: ", environments.negative_points_positions[:, 1])
 
 
-    width = environments.maze_cell_size * environments.maze_columns
-    height = environments.maze_cell_size * environments.maze_rows
     number_iterations = 1000
+    width = environments.maze_rows * environments.maze_cell_size
+    height = environments.maze_columns * environments.maze_cell_size
 
+
+    
     @play width height number_iterations begin
-        step(1, environments)
+
+        action = CuArray(rand(Uniform(-1.0, 1.0), 2))
+        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_collect_points(action, environments, env_seed)
+
+        CUDA.synchronize()
+
         render(environments)
     end
-
 end
 
 
