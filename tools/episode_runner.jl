@@ -68,7 +68,21 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset)
     offset += sizeof(action)
 
-    # TODO
+    sync_threads()
+
+    initialize(tx, bx, individuals, brains)
+
+    sync_threads()
+
+    for i = 1:1000
+
+        if tx <= brains.input_size
+            input[tx] = rand(Float32)
+        end
+
+        step(tx, bx, input, action, brains)
+
+    end
 
     return
 end

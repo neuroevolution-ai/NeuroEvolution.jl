@@ -39,7 +39,7 @@ end
 
 function main()
 
-    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense.json"
+    configuration_file = "configurations/Randomizer_CTRNN_Dense.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
