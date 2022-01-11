@@ -56,17 +56,17 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     bx = blockIdx().x
 
     fitness_total = 0
-    offset = 0
+    offset_shared_memory = 0
 
     sync_threads()
 
-    input = @cuDynamicSharedMem(Float32, environments.number_inputs, offset)
-    offset += sizeof(input)
+    input = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
+    offset_shared_memory += sizeof(input)
 
     sync_threads()
 
-    action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset)
-    offset += sizeof(action)
+    action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset_shared_memory)
+    offset_shared_memory += sizeof(action)
 
     sync_threads()
 
@@ -80,7 +80,7 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
             input[tx] = rand(Float32)
         end
 
-        step(tx, bx, input, action, brains)
+        step(tx, bx, input, action, offset_shared_memory, brains)
 
     end
 

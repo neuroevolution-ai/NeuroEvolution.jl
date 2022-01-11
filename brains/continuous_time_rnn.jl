@@ -92,48 +92,16 @@ function reset(threadID, blockID, brains::ContinuousTimeRNN)
 
 end
 
-function step(threadID, blockID, input, action, brains::ContinuousTimeRNN)
+function step(threadID, blockID, input, action, offset_shared_memory, brains::ContinuousTimeRNN)
 
-    offset = 0
-
-    V = @cuDynamicSharedMem(Float32, (brains.number_neurons, brains.input_size), offset)
-    offset += sizeof(V)
-
-    W = @cuDynamicSharedMem(Float32, (brains.number_neurons, brains.number_neurons), offset)
-    offset += sizeof(W)
-
-    T = @cuDynamicSharedMem(Float32, (brains.output_size, brains.number_neurons), offset)
-    offset += sizeof(T)
-
-    x = @cuDynamicSharedMem(Float32, brains.number_neurons, offset)
-    offset += sizeof(x)
-
-    V_value = @cuDynamicSharedMem(Float32, brains.number_neurons, offset)
+    V_value = @cuDynamicSharedMem(Float32, brains.number_neurons, offset_shared_memory)
 
     if threadID <= brains.number_neurons
-
-        # Initialize V (shared memory)
-        for i = 1:brains.input_size
-            @inbounds V[threadID, i] = brains.V[threadID, i, blockID]
-        end
-
-        # Initialize W (shared memory)
-        for i = 1:brains.number_neurons
-            @inbounds W[threadID, i] = brains.W[threadID, i, blockID]
-        end
-
-        # Initialize T (shared memory)
-        for i = 1:brains.output_size
-            @inbounds T[i, threadID] = brains.T[i, threadID, blockID]
-        end
-
-        # Initialize x (shared memory)
-        @inbounds x[threadID] = brains.x[threadID, blockID]
 
         # V_value = V * input (Matrix-Vector-Multiplication)
         V_value[threadID] = 0.0
         for i = 1:brains.input_size
-            @inbounds V_value[threadID] += (V[threadID, i] * input[i])
+            @inbounds V_value[threadID] += (brains.V[threadID, i, blockID] * input[i])
         end
 
         sync_threads()
@@ -143,26 +111,26 @@ function step(threadID, blockID, input, action, brains::ContinuousTimeRNN)
             # W_value = W * tanh(x) (Matrix-Vector-Multiplication)
             W_value = 0.0
             for i = 1:brains.number_neurons
-                @inbounds W_value += (W[threadID, i] * tanh(x[i]))
+                @inbounds W_value += (brains.W[threadID, i, blockID] * tanh(brains.x[i, blockID]))
             end
 
             sync_threads()
 
             # Differential Equation
-            dx_dt = -brains.alpha * x[threadID] + W_value + V_value[threadID]
+            dx_dt = -brains.alpha * brains.x[threadID, blockID] + W_value + V_value[threadID]
 
         elseif brains.differential_equation == LiHoChow2005
 
             # W_value = W * (tanh(x) + V_value) (Matrix-Vector-Multiplication)
             W_value = 0.0
             for i = 1:brains.number_neurons
-                @inbounds W_value += (W[threadID, i] * (tanh(x[i] + V_value[i])))
+                @inbounds W_value += (brains.W[threadID, i, blockID] * (tanh(brains.x[i, blockID] + V_value[i])))
             end
 
             sync_threads()
 
             # Differential Equation
-            dx_dt = -brains.alpha * x[threadID] + W_value
+            dx_dt = -brains.alpha * brains.x[threadID, blockID] + W_value
 
         end
 
@@ -181,7 +149,7 @@ function step(threadID, blockID, input, action, brains::ContinuousTimeRNN)
         # T_value = T * x (Matrix-Vector-Multiplication)
         T_value = 0.0
         for i = 1:brains.number_neurons
-            T_value += T[threadID, i] * brains.x[i, blockID]
+            T_value += brains.T[threadID, i, blockID] * brains.x[i, blockID]
         end
 
         # Calculate outputs

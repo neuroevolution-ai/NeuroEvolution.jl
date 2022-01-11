@@ -28,12 +28,13 @@ function kernel_test_brain_step(input_all, output_all, brains)
     tx = threadIdx().x
     bx = blockIdx().x
 
-    offset = get_memory_requirements(brains)
+    offset = 0
 
     input = @cuDynamicSharedMem(Float32, brains.input_size, offset)
     offset += sizeof(input)
 
     output = @cuDynamicSharedMem(Float32, brains.output_size, offset)
+    offset += sizeof(output)
 
     sync_threads()
 
@@ -44,7 +45,7 @@ function kernel_test_brain_step(input_all, output_all, brains)
 
     sync_threads()
 
-    step(tx, bx, input, output, brains)
+    step(tx, bx, input, output, offset, brains)
 
     sync_threads()
 
