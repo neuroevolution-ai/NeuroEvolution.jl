@@ -39,7 +39,7 @@ end
 
 function main()
 
-    configuration_file = "configurations/Randomizer_CTRNN_Dense.json"
+    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
@@ -95,7 +95,7 @@ function main()
     # Run evolutionary training for given number of generations
     for generation = 1:config.number_generations
 
-        start_time_generation = now()
+        start_time_generation = time()
 
         # Environment seed for this generation (excludes validation environment seeds)
         env_seed = Random.rand(config.number_validation_runs:config.maximum_env_seed)
@@ -142,10 +142,7 @@ function main()
         end
 
         # Logging and printing
-        elapsed_time_current_generation = now() - start_time_generation
-        elapsed_time_current_generation =
-            string(Second(floor(elapsed_time_current_generation, Second))) *
-            string(elapsed_time_current_generation % 1000)
+        elapsed_time_current_generation = round(time() - start_time_generation, digits=3)
         log_line = OrderedDict()
         log_line["gen"] = generation
         log_line["min"] = minimum(rewards_training)
@@ -155,12 +152,12 @@ function main()
         log_line["elapsed_time"] = elapsed_time_current_generation
         log[generation] = log_line
         println(
-            "Generation:", generation,
-            " Min:", findmin(rewards_training)[1],
-            " Mean:", mean(rewards_training),
-            " Max:", findmax(rewards_training)[1],
-            " Best:", best_reward_overall,
-            " elapsed time (s):", elapsed_time_current_generation,
+            "Generation: ", generation,
+            "   Min: ", minimum(rewards_training),
+            "   Mean: ", mean(rewards_training),
+            "   Max: ", maximum(rewards_training),
+            "   Best: ", best_reward_overall,
+            "   Elapsed time: ", elapsed_time_current_generation, "s"
         )
     end
 
