@@ -8,6 +8,7 @@ using DataStructures
 include("environments/collect_points.jl")
 include("brains/continuous_time_rnn.jl")
 include("optimizers/cma_es.jl")
+include("optimizers/randomizer.jl")
 include("tools/episode_runner.jl")
 include("tools/write_results.jl")
 
@@ -38,7 +39,7 @@ end
 
 function main()
 
-    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense_original.json"
+    configuration_file = "configurations/Randomizer_CTRNN_Dense.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
@@ -54,8 +55,13 @@ function main()
     brain_type = ContinuousTimeRNN
 
     # Get optimizer type from configuration 
-    # TODO: Choose optimizer type from configuration
-    optimizer_type = OptimizerCmaEs
+    if configuration["optimizer"]["type"] == "Randomizer"
+        optimizer_type = OptimizerRandom
+    elseif configuration["optimizer"]["type"] == "CMA-ES-Deap"
+        optimizer_type = OptimizerCmaEs
+    else
+        error("No valid optimizer type")
+    end
 
     number_individuals = config.optimizer["population_size"]
 
