@@ -83,9 +83,8 @@ function main()
     best_reward_overall = typemin(Int32)
 
     required_shared_memory =
-        sizeof(Int32) +
-        get_memory_requirements(brains) +
-        get_memory_requirements(environments)
+        sizeof(Float32) * (number_inputs + number_outputs) +
+        get_memory_requirements(brains) + get_memory_requirements(environments)
 
     # Get start time of training and date
     start_time_training = now()

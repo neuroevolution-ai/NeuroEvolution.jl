@@ -49,12 +49,7 @@ Adapt.@adapt_structure ContinuousTimeRNN
 
 
 function get_memory_requirements(brains::ContinuousTimeRNN)
-    return sizeof(Float32) *
-           (brains.number_neurons + 
-           brains.number_neurons * brains.input_size + 
-           brains.number_neurons * brains.number_neurons +
-           brains.output_size * brains.number_neurons + 
-           brains.number_neurons)
+    return sizeof(Float32) * brains.number_neurons
 end
 
 function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
