@@ -52,7 +52,7 @@ function get_memory_requirements(brains::ContinuousTimeRNN)
     return sizeof(Float32) * brains.number_neurons
 end
 
-function initialize(individuals, brains::ContinuousTimeRNN)
+function initialize(brains::ContinuousTimeRNN, individuals)
 
     threadID = threadIdx().x
     blockID = blockIdx().x
@@ -95,7 +95,7 @@ function reset(brains::ContinuousTimeRNN)
 
 end
 
-function step(input, action, offset_shared_memory, brains::ContinuousTimeRNN)
+function step(brains::ContinuousTimeRNN, input, output, offset_shared_memory)
 
     threadID = threadIdx().x
     blockID = blockIdx().x
@@ -159,7 +159,7 @@ function step(input, action, offset_shared_memory, brains::ContinuousTimeRNN)
         end
 
         # Calculate outputs
-        action[threadID] = tanh(T_value)
+        output[threadID] = tanh(T_value)
 
     end
 

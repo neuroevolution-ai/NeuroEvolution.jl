@@ -8,7 +8,7 @@ include("../brains/continuous_time_rnn.jl")
 
 function kernel_test_initialize(individuals, brains)
 
-    initialize(individuals, brains)
+    initialize(brains, individuals)
 
     sync_threads()
 
@@ -25,13 +25,13 @@ function kernel_test_brain_step(input_all, output_all, brains)
     threadID = threadIdx().x
     blockID = blockIdx().x
 
-    offset = 0
+    offset_shared_memory = 0
 
-    input = @cuDynamicSharedMem(Float32, brains.input_size, offset)
-    offset += sizeof(input)
+    input = @cuDynamicSharedMem(Float32, brains.input_size, offset_shared_memory)
+    offset_shared_memory += sizeof(input)
 
-    output = @cuDynamicSharedMem(Float32, brains.output_size, offset)
-    offset += sizeof(output)
+    output = @cuDynamicSharedMem(Float32, brains.output_size, offset_shared_memory)
+    offset_shared_memory += sizeof(output)
 
     sync_threads()
 
@@ -42,7 +42,7 @@ function kernel_test_brain_step(input_all, output_all, brains)
 
     sync_threads()
 
-    step(input, output, offset, brains)
+    step(brains, input, output, offset_shared_memory)
 
     sync_threads()
 

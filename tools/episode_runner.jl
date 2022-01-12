@@ -65,15 +65,15 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    initialize(individuals, brains)
-    initialize(input, environments, offset_shared_memory, environment_seeds[blockIdx().x])
+    initialize(brains, individuals)
+    initialize(environments, input, environment_seeds[blockIdx().x], offset_shared_memory)
 
     sync_threads()
 
     for i = 1:1000
 
-        step(input, action, offset_shared_memory, brains)
-        step(action, environments, offset_shared_memory)
+        step(brains, input, action, offset_shared_memory)
+        step(environments, action, offset_shared_memory)
 
     end
 

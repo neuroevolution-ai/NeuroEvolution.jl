@@ -57,7 +57,7 @@ end
 Adapt.@adapt_structure DummyApp
 
 
-function initialize(input, environments::DummyApp, offset_shared_memory, env_seed)
+function initialize(environments::DummyApp, input, env_seed, offset_shared_memory)
 
     threadID = threadIdx().x
     blockID = blockIdx().x
@@ -77,7 +77,7 @@ function initialize(input, environments::DummyApp, offset_shared_memory, env_see
     return
 end
 
-function step(action, environments::DummyApp, offset_shared_memory)
+function step(environments::DummyApp, action, offset_shared_memory)
 
     clicked_gui_elements =
         @cuDynamicSharedMem(Bool, environments.number_gui_elements, offset_shared_memory)
