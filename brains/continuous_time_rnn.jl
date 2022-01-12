@@ -52,7 +52,10 @@ function get_memory_requirements(brains::ContinuousTimeRNN)
     return sizeof(Float32) * brains.number_neurons
 end
 
-function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
+function initialize(individuals, brains::ContinuousTimeRNN)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     v_size = brains.input_size * brains.number_neurons
     w_size = brains.number_neurons * brains.number_neurons
@@ -79,7 +82,10 @@ function initialize(threadID, blockID, individuals, brains::ContinuousTimeRNN)
 
 end
 
-function reset(threadID, blockID, brains::ContinuousTimeRNN)
+function reset(brains::ContinuousTimeRNN)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     if threadID <= brains.number_neurons
         @inbounds brains.x[threadID, blockID] = 0.0
@@ -89,7 +95,10 @@ function reset(threadID, blockID, brains::ContinuousTimeRNN)
 
 end
 
-function step(threadID, blockID, input, action, offset_shared_memory, brains::ContinuousTimeRNN)
+function step(input, action, offset_shared_memory, brains::ContinuousTimeRNN)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     V_value = @cuDynamicSharedMem(Float32, brains.number_neurons, offset_shared_memory)
 

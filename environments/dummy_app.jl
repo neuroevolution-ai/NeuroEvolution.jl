@@ -57,7 +57,10 @@ end
 Adapt.@adapt_structure DummyApp
 
 
-function initialize(threadID, blockID, input, environments::DummyApp, offset, env_seed)
+function initialize(input, environments::DummyApp, offset_shared_memory, env_seed)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     # Uncheck all checkboxes
     if threadID <= environments.number_checkboxes
@@ -74,12 +77,12 @@ function initialize(threadID, blockID, input, environments::DummyApp, offset, en
     return
 end
 
-function step(threadID, blockID, action, environments::DummyApp, offset_shared_memory)
+function step(action, environments::DummyApp, offset_shared_memory)
 
     clicked_gui_elements =
         @cuDynamicSharedMem(Bool, environments.number_gui_elements, offset_shared_memory)
 
-    pointInRect(environments, threadID, blockID, action, environments.gui_elements_rectangles, clicked_gui_elements)
+    is_point_in_rect(environments, action, environments.gui_elements_rectangles, clicked_gui_elements)
 
     sync_threads()
 
@@ -97,7 +100,10 @@ function get_number_outputs(environments::DummyApp)
     return environments.number_outputs
 end
 
-function pointInRect(environments::DummyApp, threadID, blockID, point, rectangles, clicked_gui_elements)
+function is_point_in_rect(environments::DummyApp, point, rectangles, result)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     if threadID <= environments.number_gui_elements
         x1 = rectangles[threadID, 1, blockID]
@@ -111,7 +117,7 @@ function pointInRect(environments::DummyApp, threadID, blockID, point, rectangle
         x = point[1]
         y = point[2]
 
-        clicked_gui_elements[threadID] = x1 < x && x < x2 && y1 < y && y < y2
+        result[threadID] = x1 < x && x < x2 && y1 < y && y < y2
     end
 
     return

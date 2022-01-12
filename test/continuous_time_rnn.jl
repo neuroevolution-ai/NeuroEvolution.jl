@@ -8,14 +8,11 @@ include("../brains/continuous_time_rnn.jl")
 
 function kernel_test_initialize(individuals, brains)
 
-    tx = threadIdx().x
-    bx = blockIdx().x
-
-    initialize(tx, bx, individuals, brains)
+    initialize(individuals, brains)
 
     sync_threads()
 
-    reset(tx, bx, brains)
+    reset(brains)
 
     sync_threads()
 
@@ -25,8 +22,8 @@ end
 
 function kernel_test_brain_step(input_all, output_all, brains)
 
-    tx = threadIdx().x
-    bx = blockIdx().x
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     offset = 0
 
@@ -39,19 +36,19 @@ function kernel_test_brain_step(input_all, output_all, brains)
     sync_threads()
 
     # Load inputs to shared memory
-    if tx <= brains.input_size
-        input[tx] = input_all[tx, bx]
+    if threadID <= brains.input_size
+        input[threadID] = input_all[threadID, blockID]
     end
 
     sync_threads()
 
-    step(tx, bx, input, output, offset, brains)
+    step(input, output, offset, brains)
 
     sync_threads()
 
     # Load outputs from shared memory
-    if tx <= brains.output_size
-        output_all[tx, bx] = output[tx]
+    if threadID <= brains.output_size
+        output_all[threadID, blockID] = output[threadID]
     end
 
     return
