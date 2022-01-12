@@ -52,8 +52,8 @@ end
 
 function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains, environments)
 
-    tx = threadIdx().x
-    bx = blockIdx().x
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     fitness_total = 0
     offset_shared_memory = 0
@@ -70,15 +70,15 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    initialize(tx, bx, individuals, brains)
-    initialize(tx, bx, input, environments, offset_shared_memory, environment_seeds[bx])
+    initialize(threadID, blockID, individuals, brains)
+    initialize(threadID, blockID, input, environments, offset_shared_memory, environment_seeds[blockID])
 
     sync_threads()
 
     for i = 1:1000
 
-        step(tx, bx, input, action, offset_shared_memory, brains)
-        step(tx, bx, action, environments, offset_shared_memory)
+        step(threadID, blockID, input, action, offset_shared_memory, brains)
+        step(threadID, blockID, action, environments, offset_shared_memory)
 
     end
 
