@@ -77,7 +77,7 @@ function initialize(environments::DummyApp, input, env_seed, offset_shared_memor
     return
 end
 
-function step(environments::DummyApp, action, offset_shared_memory)
+function step(environments::DummyApp, action, ob, time_step, offset_shared_memory)
 
     clicked_gui_elements =
         @cuDynamicSharedMem(Bool, environments.number_gui_elements, offset_shared_memory)
@@ -85,6 +85,11 @@ function step(environments::DummyApp, action, offset_shared_memory)
     is_point_in_rect(environments, action, environments.gui_elements_rectangles, clicked_gui_elements)
 
     sync_threads()
+
+    done = false
+    rew = 0.0
+
+    return rew, done
 
 end
 

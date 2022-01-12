@@ -52,11 +52,13 @@ end
 
 function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains, environments)
 
-    fitness_total = 0
+    threadID = threadIdx().x
+    blockID = blockIdx().x
+
     offset_shared_memory = 0
 
-    input = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
-    offset_shared_memory += sizeof(input)
+    ob = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
+    offset_shared_memory += sizeof(ob)
 
     sync_threads()
 
@@ -66,15 +68,25 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     sync_threads()
 
     initialize(brains, individuals)
-    initialize(environments, input, environment_seeds[blockIdx().x], offset_shared_memory)
+    initialize(environments, ob, environment_seeds[blockID], offset_shared_memory)
 
-    sync_threads()
+    fitness_current = 0
+    done = false
 
-    for i = 1:1000
+    for time_step in 1:environments.number_time_steps
 
-        step(brains, input, action, offset_shared_memory)
-        step(environments, action, offset_shared_memory)
+        step(brains, ob, action, offset_shared_memory)
+        rew, done = step(environments, action, ob, time_step, offset_shared_memory)
+        fitness_current += rew
 
+        if done == true
+            break
+        end
+
+    end
+
+    if threadID == 1
+        rewards[blockID] = fitness_current
     end
 
     return
