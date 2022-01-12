@@ -82,7 +82,13 @@ function step(environments::DummyApp, action, ob, time_step, offset_shared_memor
     clicked_gui_elements =
         @cuDynamicSharedMem(Bool, environments.number_gui_elements, offset_shared_memory)
 
-    is_point_in_rect(environments, action, environments.gui_elements_rectangles, clicked_gui_elements)
+    clicked_giu_element(
+        environments.number_gui_elements,
+        action[1],
+        action[2],
+        environments.gui_elements_rectangles,
+        clicked_gui_elements,
+    )
 
     sync_threads()
 
@@ -105,27 +111,30 @@ function get_number_outputs(environments::DummyApp)
     return environments.number_outputs
 end
 
-function is_point_in_rect(environments::DummyApp, point, rectangles, result)
+function clicked_giu_element(number_gui_elements, point_x, point_y, rectangles, result)
 
     threadID = threadIdx().x
     blockID = blockIdx().x
 
-    if threadID <= environments.number_gui_elements
-        x1 = rectangles[threadID, 1, blockID]
-        y1 = rectangles[threadID, 2, blockID]
+    if threadID <= number_gui_elements
+        rect_x = rectangles[threadID, 1, blockID]
+        rect_y = rectangles[threadID, 2, blockID]
         width = rectangles[threadID, 3, blockID]
         height = rectangles[threadID, 4, blockID]
 
-        x2 = x1 + width
-        y2 = y1 + height
-
-        x = point[1]
-        y = point[2]
-
-        result[threadID] = x1 < x && x < x2 && y1 < y && y < y2
+        result[threadID] = is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
     end
 
     return
 end
 
+function is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
 
+    x1 = rect_x
+    y1 = rect_y
+
+    x2 = x1 + width
+    y2 = y1 + height
+
+    return x1 < point_x && point_x < x2 && y1 < point_y && point_y < y2
+end
