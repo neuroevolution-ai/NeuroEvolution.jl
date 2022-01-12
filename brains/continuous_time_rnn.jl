@@ -85,6 +85,8 @@ function reset(threadID, blockID, brains::ContinuousTimeRNN)
         @inbounds brains.x[threadID, blockID] = 0.0
     end
 
+    sync_threads()
+
 end
 
 function step(threadID, blockID, input, action, offset_shared_memory, brains::ContinuousTimeRNN)

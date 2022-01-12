@@ -50,7 +50,7 @@ function validation_runs(individual, individual_size, number_validation_runs, br
 
 end
 
-function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains::ContinuousTimeRNN, environments::CollectPoints)
+function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains, environments)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -71,16 +71,14 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     sync_threads()
 
     initialize(tx, bx, individuals, brains)
+    initialize(tx, bx, input, environments, offset_shared_memory, environment_seeds[bx])
 
     sync_threads()
 
     for i = 1:1000
 
-        if tx <= brains.input_size
-            input[tx] = rand(Float32)
-        end
-
         step(tx, bx, input, action, offset_shared_memory, brains)
+        step(tx, bx, action, environments, offset_shared_memory)
 
     end
 

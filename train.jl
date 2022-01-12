@@ -6,6 +6,7 @@ using Dates
 using DataStructures
 
 include("environments/collect_points.jl")
+include("environments/dummy_app.jl")
 include("brains/continuous_time_rnn.jl")
 include("optimizers/cma_es.jl")
 include("optimizers/randomizer.jl")
@@ -48,7 +49,7 @@ function main()
 
     # Get environment type from configuration 
     # TODO: Choose environment type from configuration
-    environment_type = CollectPoints
+    environment_type = DummyApp
 
     # Get brain type from configuration
     # TODO: Choose brain type from configuration
@@ -141,7 +142,7 @@ function main()
         end
 
         # Logging and printing
-        elapsed_time_current_generation = round(time() - start_time_generation, digits=3)
+        elapsed_time_current_generation = round(time() - start_time_generation, digits = 3)
         log_line = OrderedDict()
         log_line["gen"] = generation
         log_line["min"] = minimum(rewards_training)
