@@ -70,5 +70,3 @@ end
     end
 
 end
-
-println("Finished")

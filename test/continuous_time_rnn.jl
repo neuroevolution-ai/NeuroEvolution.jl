@@ -158,5 +158,3 @@ end
         end
     end
 end
-
-println("Finished")

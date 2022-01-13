@@ -63,4 +63,3 @@ tolerance = 0.00001
     end
 end
 
-println("Finished")
