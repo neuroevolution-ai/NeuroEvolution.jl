@@ -64,6 +64,11 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     offset_shared_memory = 0
 
+    reward = @cuDynamicSharedMem(Float32, 1, offset_shared_memory)
+    offset_shared_memory += sizeof(reward)
+
+    sync_threads()
+
     ob = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
     offset_shared_memory += sizeof(ob)
 
@@ -74,73 +79,45 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
+    clicked_gui_elements = @cuDynamicSharedMem(Int32, environments.number_gui_elements, offset_shared_memory)
+    offset_shared_memory += sizeof(clicked_gui_elements)
+
+    sync_threads()
+
+    # Initialize brains
     initialize(brains, individuals)
-    initialize(environments, ob, environment_seeds[blockID], offset_shared_memory)
 
-    fitness_current = 0
-    done = false
+    # Uncheck all checkboxes
 
-    for time_step in 1:environments.number_time_steps
+    # Initialize inputs
+    if threadID <= environments.number_inputs
+        ob[threadID] = 0.5
+    end
 
+    reward = 0.0
+
+    # Iterate over given number of time steps
+    for time_step = 1:environments.number_time_steps
+
+        # Brain step
         step(brains, ob, action, offset_shared_memory)
-        rew, done = step(environments, action, ob, time_step, offset_shared_memory)
-        fitness_current += rew
 
-        if done == true
-            break
-        end
+        # Process mouse click
+        process_click(environments.number_gui_elements, action[1], action[2], environments.gui_elements_rectangles, clicked_gui_elements)
 
     end
 
     if threadID == 1
-        rewards[blockID] = fitness_current
+        rewards[blockID] = reward
     end
 
     return
 end
 
-
-function initialize(environments::DummyApp, input, env_seed, offset_shared_memory)
-
-    threadID = threadIdx().x
-    blockID = blockIdx().x
-
-    # Uncheck all checkboxesrew
-
-    # Initialize inputs
-    if threadID <= environments.number_inputs
-        input[threadID] = 0.5
-    end
-
-    sync_threads()
-
-    return
-end
-
-function step(environments::DummyApp, action, ob, time_step, offset_shared_memory)
-
-    clicked_gui_elements =
-        @cuDynamicSharedMem(Bool, environments.number_gui_elements, offset_shared_memory)
-
-    clicked_giu_element(
-        environments.number_gui_elements,
-        action[1],
-        action[2],
-        environments.gui_elements_rectangles,
-        clicked_gui_elements,
-    )
-
-    sync_threads()
-
-    done = false
-    rew = 0.0
-
-    return rew, done
-
-end
 
 function get_memory_requirements(environments::DummyApp)
-    return sizeof(Int32) * environments.number_gui_elements
+    return sizeof(Float32) * (1 + environments.number_inputs + environments.number_outputs) + sizeof(Int32) * environments.number_gui_elements  # Reward + Observation + Action
+            
 end
 
 function get_number_inputs(environments::DummyApp)
@@ -151,7 +128,7 @@ function get_number_outputs(environments::DummyApp)
     return environments.number_outputs
 end
 
-function clicked_giu_element(number_gui_elements, point_x, point_y, rectangles, result)
+function process_click(number_gui_elements, point_x, point_y, rectangles, result)
 
     threadID = threadIdx().x
     blockID = blockIdx().x
@@ -164,6 +141,8 @@ function clicked_giu_element(number_gui_elements, point_x, point_y, rectangles, 
 
         result[threadID] = is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
     end
+
+    sync_threads()
 
     return
 end

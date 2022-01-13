@@ -83,9 +83,7 @@ function main()
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
 
-    required_shared_memory =
-        sizeof(Float32) * (number_inputs + number_outputs) +
-        get_memory_requirements(brains) + get_memory_requirements(environments)
+    required_shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments)
 
     # Get start time of training and date
     start_time_training = now()
