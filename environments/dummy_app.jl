@@ -62,10 +62,7 @@ function initialize(environments::DummyApp, input, env_seed, offset_shared_memor
     threadID = threadIdx().x
     blockID = blockIdx().x
 
-    # Uncheck all checkboxes
-    if threadID <= environments.number_checkboxes
-        environments.checkboxes_checked[threadID, blockID] = false
-    end
+    # Uncheck all checkboxesrew
 
     # Initialize inputs
     if threadID <= environments.number_inputs
@@ -136,5 +133,5 @@ function is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
     x2 = x1 + width
     y2 = y1 + height
 
-    return x1 < point_x && point_x < x2 && y1 < point_y && point_y < y2
+    return x1 <= point_x <= x2 && y1 <= point_y <= y2
 end
