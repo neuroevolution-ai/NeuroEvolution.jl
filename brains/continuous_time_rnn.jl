@@ -61,11 +61,11 @@ function initialize(brains::ContinuousTimeRNN, individuals)
     w_size = brains.number_neurons * brains.number_neurons
 
     for i = 1:brains.input_size
-        @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID+((i-1)*brains.number_neurons)]
+        @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons]
     end
 
     for i = 1:brains.number_neurons
-        @inbounds brains.W[threadID, i, blockID] = individuals[blockID, v_size+(threadID+((i-1)*brains.number_neurons))]
+        @inbounds brains.W[threadID, i, blockID] = individuals[blockID, v_size+(threadID+(i-1)*brains.number_neurons)]
     end
 
     sync_threads()
@@ -75,7 +75,7 @@ function initialize(brains::ContinuousTimeRNN, individuals)
     end
 
     for i = 1:brains.output_size
-        @inbounds brains.T[i, threadID, blockID] = individuals[blockID, v_size+w_size+(i+((threadID-1)*brains.output_size))]
+        @inbounds brains.T[i, threadID, blockID] = individuals[blockID, v_size+w_size+(i+(threadID-1)*brains.output_size)]
     end
 
     sync_threads()
