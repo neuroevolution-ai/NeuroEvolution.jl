@@ -80,6 +80,10 @@ function initialize(brains::ContinuousTimeRNN, individuals)
 
     sync_threads()
 
+    reset(brains)
+
+    sync_threads()
+
 end
 
 function reset(brains::ContinuousTimeRNN)
