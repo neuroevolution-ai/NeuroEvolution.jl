@@ -40,8 +40,8 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Float32, configuration["reward_per_collected_positive_point"]),
         convert(Float32, configuration["reward_per_collected_negative_point"]),
         convert(Int32, configuration["number_time_steps"]),
-        10,
         2,
+        10,
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
@@ -58,27 +58,31 @@ end
 Adapt.@adapt_structure CollectPoints
 
 
-function initialize(threadID, blockID, input, environments::CollectPoints, offset, env_seed)
+function initialize(threadID, blockID, environments::CollectPoints, offset, env_seed)
 
-    if threadID == 1
-
-        Random.seed!(Random.default_rng(), env_seed)
+    if threadID == 1 
+        #Build maze 
         create_maze(threadID, blockID, environments, offset)
 
+        #Randomly place agent and points in maze
         environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
         environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
         environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
 
-        
+        #Calculate initial Sensor distances
+        cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
+        cell_y = convert(Int, ceil(environments.agents_positions[2, blockID] / environments.maze_cell_size))
+        calculate_sensor_distance(blockID, cell_x, cell_y, environments)
+
     end
 
     return
 
 end
 
-function step(threadID, blockID, action, offset, environments::CollectPoints)
+function step(threadID, blockID, action, observations, offset, environments::CollectPoints)
 
-    if threadID == 1
+    if threadID == 1 
         move_range = environments.agent_movement_range
         maze_width = environments.maze_cell_size * environments.maze_rows
         maze_heigth = environments.maze_cell_size * environments.maze_columns
@@ -155,31 +159,56 @@ function step(threadID, blockID, action, offset, environments::CollectPoints)
             if blockID == 1
                 @cuprintln("reward: $reward")
             end    
-        end   
-    end    
+        end
+        
+        get_observations(threadID, blockID, observations, environments)
+    end
 end
+
+function get_observations(threadID, blockID, observations, environments::CollectPoints)
+
+    if threadID ==1
+        @cuprintln("BlockID: $blockID")
+        maze_width = environments.maze_cell_size * environments.maze_rows
+        maze_heigth = environments.maze_cell_size * environments.maze_columns
+
+        observations[1, blockID] = environments.agents_positions[1, blockID] / maze_width
+        observations[2, blockID] = environments.agents_positions[2, blockID] / maze_heigth
+
+        observations[3, blockID] = environments.sensor_distances[1, blockID] / maze_heigth
+        observations[4, blockID] = environments.sensor_distances[2, blockID] / maze_heigth
+        observations[5, blockID] = environments.sensor_distances[3, blockID] / maze_width
+        observations[6, blockID] = environments.sensor_distances[4, blockID] / maze_width
+
+        observations[7, blockID] = environments.positive_points_positions[1, blockID] / maze_width
+        observations[8, blockID] = environments.positive_points_positions[2, blockID] / maze_heigth
+
+        observations[9, blockID] = environments.negative_points_positions[1, blockID] / maze_width
+        observations[10, blockID] = environments.negative_points_positions[2, blockID] / maze_heigth
+    end
+end    
 
 function calculate_sensor_distance(blockID, cell_x:: Int, cell_y:: Int, environments::CollectPoints,)
 
-        # Get coordinates of current cell
-        cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(cell_x, cell_y, environments.maze_cell_size)
+     # Get coordinates of current cell
+    cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(cell_x, cell_y, environments.maze_cell_size)
 
-        #Asuming we have 4 Sensors
-        #North distance
-        environments.sensor_distances[1, blockID] = environments.agents_positions[2, blockID] - cell_top - environments.agent_radius
-        environments.sensor_distances[1, blockID] += travers_maze(blockID, cell_x, cell_y, 1, environments) * environments.maze_cell_size
+    #Asuming we have 4 Sensors
+    #North distance
+    environments.sensor_distances[1, blockID] = environments.agents_positions[2, blockID] - cell_top - environments.agent_radius
+    environments.sensor_distances[1, blockID] += travers_maze(blockID, cell_x, cell_y, 1, environments) * environments.maze_cell_size
 
-        #South distance
-        environments.sensor_distances[2, blockID] = cell_bottom - environments.agents_positions[2, blockID] - environments.agent_radius
-        environments.sensor_distances[2, blockID] += travers_maze(blockID, cell_x, cell_y, 2, environments) * environments.maze_cell_size
+    #South distance
+    environments.sensor_distances[2, blockID] = cell_bottom - environments.agents_positions[2, blockID] - environments.agent_radius
+    environments.sensor_distances[2, blockID] += travers_maze(blockID, cell_x, cell_y, 2, environments) * environments.maze_cell_size
 
-        #East distance
-        environments.sensor_distances[3, blockID] = cell_right - environments.agents_positions[1, blockID] - environments.agent_radius
-        environments.sensor_distances[3, blockID] += travers_maze(blockID, cell_x, cell_y, 3, environments) * environments.maze_cell_size
+    #East distance
+    environments.sensor_distances[3, blockID] = cell_right - environments.agents_positions[1, blockID] - environments.agent_radius
+    environments.sensor_distances[3, blockID] += travers_maze(blockID, cell_x, cell_y, 3, environments) * environments.maze_cell_size
 
-        #West distance 
-        environments.sensor_distances[4, blockID] = environments.agents_positions[1, blockID] - cell_left - environments.agent_radius
-        environments.sensor_distances[4, blockID] += travers_maze(blockID, cell_x, cell_y, 4, environments) * environments.maze_cell_size
+    #West distance 
+    environments.sensor_distances[4, blockID] = environments.agents_positions[1, blockID] - cell_left - environments.agent_radius
+    environments.sensor_distances[4, blockID] += travers_maze(blockID, cell_x, cell_y, 4, environments) * environments.maze_cell_size
 end 
 
 #Iterates from agents position towards given direction and returns number of traversed cells until wall is met    
@@ -190,9 +219,6 @@ function travers_maze(blockID, cell_x, cell_y, direction, environments::CollectP
     y = cell_y
 
     while true
-        #if !is_valid_cell(x, y, environments)
-         #   break
-        #end
 
         if direction == 1
             if environments.maze_walls_north[x, y, blockID]
@@ -230,8 +256,8 @@ function travers_maze(blockID, cell_x, cell_y, direction, environments::CollectP
             end    
         end
     end
-    return number_traversed_cells 
-end
+    return number_traversed_cells   
+end    
 
 function get_memory_requirements(environments::CollectPoints)
     total_amount_of_cells = environments.maze_columns * environments.maze_rows
@@ -256,31 +282,31 @@ function is_valid_cell(x_index, y_index, environments::CollectPoints)
     end        
 end  
 
-function render(environments::CollectPoints)
+function render(environments::CollectPoints, individual)
 
     # Draw white background
     background("grey100")
 
     # Draw agent
     sethue("orange")
-    agent_position = Array(environments.agents_positions[:, 1])
-    circle(agent_position[1, 1], agent_position[2, 1], environments.agent_radius, :fill)
+    agent_position = Array(environments.agents_positions[:, individual])
+    circle(agent_position[1], agent_position[2], environments.agent_radius, :fill)
 
     # Draw positive point
     sethue("green")
-    positive_points_position = Array(environments.positive_points_positions[:, 1])
+    positive_points_position = Array(environments.positive_points_positions[:, individual])
     circle(positive_points_position[1], positive_points_position[2], environments.point_radius, :fill)
 
     # Draw negative point
     sethue("red4")
-    negative_points_position = Array(environments.negative_points_positions[:, 1])
+    negative_points_position = Array(environments.negative_points_positions[:, individual])
     circle(negative_points_position[1], negative_points_position[2], environments.point_radius, :fill)
 
     # Draw Sensor lines
     sethue("black")
     setline(1)
     setdash("dot")
-    sensor_distances = Array(environments.sensor_distances[:, 1])
+    sensor_distances = Array(environments.sensor_distances[:, individual])
 
     #North
     if sensor_distances[1] > environments.agent_radius
@@ -304,10 +330,10 @@ function render(environments::CollectPoints)
     sethue("black")
     setline(3)
     setdash("solid")
-    maze_walls_north = Array(environments.maze_walls_north[:, :, 1])
-    maze_walls_east = Array(environments.maze_walls_east[:, :, 1])
-    maze_walls_south = Array(environments.maze_walls_south[:, :, 1])
-    maze_walls_west = Array(environments.maze_walls_west[:, :, 1])
+    maze_walls_north = Array(environments.maze_walls_north[:, :, individual])
+    maze_walls_east = Array(environments.maze_walls_east[:, :, individual])
+    maze_walls_south = Array(environments.maze_walls_south[:, :, individual])
+    maze_walls_west = Array(environments.maze_walls_west[:, :, individual])
 
     for cell_x = 1:environments.maze_columns
         for cell_y = 1:environments.maze_rows
@@ -350,14 +376,27 @@ end
 
 function create_maze(threadID, blockID, environments::CollectPoints, offset)
 
+    # Reset all walls (set all entries to true)
+    for x = 1:environments.maze_columns
+        for y = 1:environments.maze_rows
+            environments.maze_walls_south[x, y, blockID] = true
+            environments.maze_walls_north[x, y, blockID] = true
+            environments.maze_walls_east[x, y, blockID] = true
+            environments.maze_walls_west[x, y, blockID] = true
+        end
+    end
+
     # Total number of cells.
     total_amount_of_cells = environments.maze_columns * environments.maze_rows
 
     index_cell_stack = 0
     cell_stack = @cuDynamicSharedMem(Int32, (total_amount_of_cells, 2), offset)
     offset += sizeof(cell_stack)
+    sync_threads()
 
     neighbours = @cuDynamicSharedMem(Int32, (4, 2), offset)
+    offset += sizeof(neighbours)
+    sync_threads()
 
     # Total number of visited cells during maze construction.
     nv = 1
@@ -370,7 +409,7 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset)
         number_neighbours = find_valid_neighbors(blockID, current_cell_x, current_cell_y, neighbours, environments)
 
         if number_neighbours == 0
-            # We've reached a dead end: backtrack, pop cell from cell stack
+          # We've reached a dead end: backtrack, pop cell from cell stack
             current_cell_x = cell_stack[index_cell_stack, 1]
             current_cell_y = cell_stack[index_cell_stack, 2]
             index_cell_stack -= 1
@@ -386,6 +425,7 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset)
         environments.maze_randoms[nv, blockID] = k
 
         # Knock down the wall between current_cell and next_cell
+
         knock_down_wall(blockID, current_cell_x, current_cell_y, next_cell_x, next_cell_y, environments)
 
         # Push current cell to cell stack
@@ -398,7 +438,7 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset)
 
         nv += 1
     end
-
+    
 end
 
 # Return a list of unvisited neighbours to cell
@@ -484,7 +524,7 @@ end
 # Knock down the wall between two cells
 function knock_down_wall(blockID, cell1_x, cell1_y, cell2_x, cell2_y, environments::CollectPoints)
 
-    # Both cells are in the same row, knock down north and south walls
+    # Both cells are in the same column, knock down north and south walls
     if cell1_x == cell2_x
 
         if cell1_y < cell2_y
@@ -496,7 +536,7 @@ function knock_down_wall(blockID, cell1_x, cell1_y, cell2_x, cell2_y, environmen
         end
     end
 
-    # Both cells are in the same column, knock down east and west walls
+    # Both cells are in the same row, knock down east and west walls
     if cell1_y == cell2_y
 
         if cell1_x < cell2_x
