@@ -2,23 +2,25 @@ using Luxor
 
 include("environments/collect_points.jl")
 include("tools/play.jl")
+include("tools/linear_congruential_generator.jl")
 
-function kernel_test_initialize(environments, env_seed)
+function kernel_test_initialize(environments, env_seed, number_individuals)
 
     tx = threadIdx().x
     bx = blockIdx().x
 
-    input = @cuDynamicSharedMem(Float32, environments.number_inputs)
-    offset = sizeof(input)
-
-    sync_threads()
+    rng_states = @cuDynamicSharedMem(Int64, number_individuals)
+    fill!(rng_states, env_seed)
     
-    initialize(tx, bx, environments, offset, env_seed)
+    offset = sizeof(rng_states)
+    sync_threads()
+
+    initialize(tx, bx, environments, offset, env_seed, rng_states)
 
     return
 end
 
-function kernel_test_collect_points(action, observations, environments, env_seed)
+function kernel_test_collect_points(action, observations, environments, env_seed, number_individuals)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -26,7 +28,12 @@ function kernel_test_collect_points(action, observations, environments, env_seed
     input = @cuDynamicSharedMem(Float32, environments.number_inputs)
     offset = sizeof(input)
     sync_threads()
-    step(tx, bx, action, observations, offset, environments)
+
+    rng_states = @cuDynamicSharedMem(Int64, number_individuals)
+    offset += sizeof(rng_states)
+    sync_threads()
+
+    step(tx, bx, action, observations, offset, environments, rng_states)
 
     return
 end
@@ -47,12 +54,14 @@ function main()
     config_environment["number_time_steps"] = 1000
 
     env_seed = rand(1:1000)
+    
+    number_individuals = 10
 
     environments = CollectPoints(config_environment, number_individuals)
 
-    shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs
+    shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs + sizeof(Int64) * number_individuals
 
-    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed)
+    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, number_individuals)
 
     CUDA.synchronize()
 
@@ -65,7 +74,7 @@ function main()
     @play width height number_iterations begin
 
         action = CuArray(rand(Uniform(-1.0, 1.0), 2))
-        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_collect_points(action, observations, environments, env_seed)
+        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_collect_points(action, observations, environments, env_seed, number_individuals)
 
         CUDA.synchronize()
 

@@ -4,7 +4,10 @@ using DataStructures
 using Random
 using Distributions
 
+include("../tools/linear_congruential_generator.jl")
+
 struct CollectPoints{A,B,C}
+
     maze_columns::Int64
     maze_rows::Int64
     maze_cell_size::Int32
@@ -58,16 +61,16 @@ end
 Adapt.@adapt_structure CollectPoints
 
 
-function initialize(threadID, blockID, environments::CollectPoints, offset, env_seed)
+function initialize(threadID, blockID, environments::CollectPoints, offset, env_seed, rng_states)
 
     if threadID == 1 
         #Build maze 
-        create_maze(threadID, blockID, environments, offset)
+        create_maze(threadID, blockID, environments, offset, rng_states)
 
         #Randomly place agent and points in maze
-        environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
-        environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
-        environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
+        environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
+        environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
+        environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
 
         #Calculate initial Sensor distances
         cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
@@ -80,7 +83,7 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
 
 end
 
-function step(threadID, blockID, action, observations, offset, environments::CollectPoints)
+function step(threadID, blockID, action, observations, offset, environments::CollectPoints, rng_states)
 
     if threadID == 1 
         move_range = environments.agent_movement_range
@@ -144,7 +147,7 @@ function step(threadID, blockID, action, observations, offset, environments::Col
         # Collect positive point in reach
         distance = sqrt((environments.positive_points_positions[1, blockID] - environments.agents_positions[1, blockID])^2 + (environments.positive_points_positions[2, blockID] - environments.agents_positions[2, blockID])^2)
         if distance <= environments.point_radius + environments.agent_radius
-            environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
+            environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
             reward += environments.reward_per_collected_positive_point
             if blockID == 1
                 @cuprintln("reward: $reward")
@@ -154,7 +157,7 @@ function step(threadID, blockID, action, observations, offset, environments::Col
         # Collect negative point in reach
         distance = sqrt((environments.negative_points_positions[1, blockID] - environments.agents_positions[1, blockID])^2 + (environments.negative_points_positions[2, blockID] - environments.agents_positions[2, blockID])^2)
         if distance <= environments.point_radius + environments.agent_radius
-            environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments)
+            environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
             reward += environments.reward_per_collected_negative_point
             if blockID == 1
                 @cuprintln("reward: $reward")
@@ -168,7 +171,6 @@ end
 function get_observations(threadID, blockID, observations, environments::CollectPoints)
 
     if threadID ==1
-        @cuprintln("BlockID: $blockID")
         maze_width = environments.maze_cell_size * environments.maze_rows
         maze_heigth = environments.maze_cell_size * environments.maze_columns
 
@@ -374,7 +376,7 @@ function get_coordinates_maze_cell(cell_x::Int, cell_y::Int, maze_cell_size::Int
 end
 
 
-function create_maze(threadID, blockID, environments::CollectPoints, offset)
+function create_maze(threadID, blockID, environments::CollectPoints, offset, rng_states)
 
     # Reset all walls (set all entries to true)
     for x = 1:environments.maze_columns
@@ -417,7 +419,7 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset)
         end
 
         # Choose a random neighbouring cell and move to it.
-        k = rand(1:number_neighbours)
+        k = lgc_random(rng_states, blockID, 1, number_neighbours)
         next_cell_x = neighbours[k, 1]
         next_cell_y = neighbours[k, 2]
 
@@ -550,13 +552,13 @@ function knock_down_wall(blockID, cell1_x, cell1_y, cell2_x, cell2_y, environmen
     end
 end
 
-function place_randomly_in_maze(blockID, environments::CollectPoints)
+function place_randomly_in_maze(blockID, environments::CollectPoints, rng_states)
 
-    x_position = rand(0:environments.maze_rows - 1) * environments.maze_cell_size
-    y_position = rand(0:environments.maze_columns - 1) * environments.maze_cell_size
+    x_position = lgc_random(rng_states, blockID, environments.maze_rows - 1) * environments.maze_cell_size
+    x_position += lgc_random(rng_states, blockID, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
 
-    x_position += rand(environments.agent_radius:(environments.maze_cell_size - environments.agent_radius))
-    y_position += rand(environments.agent_radius:(environments.maze_cell_size - environments.agent_radius))
+    y_position = lgc_random(rng_states, blockID, environments.maze_columns - 1) * environments.maze_cell_size
+    y_position += lgc_random(rng_states, blockID, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
 
     return x_position, y_position
 end
