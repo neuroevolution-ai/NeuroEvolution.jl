@@ -6,7 +6,7 @@ using JSON
 include("../brains/continuous_time_rnn.jl")
 
 
-function kernel_test_initialize(individuals, brains)
+function kernel_test_brain_initialize(individuals, brains)
 
     initialize(brains, individuals)
 
@@ -54,7 +54,7 @@ function kernel_test_brain_step(input_all, output_all, brains)
     return
 end
 
-@testset "Brain Continuous Time RNN" begin
+@testset "Continuous Time Recurrent Neural Network" begin
 
     for differential_eq in ["LiHoChow2005", "NaturalNet"]
         for set_principle_diagonal_elements_of_W_negative in [false, true]
@@ -79,16 +79,10 @@ end
 
             individual_size = get_individual_size(brains)
 
-            @test individual_size == number_inputs * brains.number_neurons + brains.number_neurons * brains.number_neurons + number_outputs * brains.number_neurons
-
-            v_size = brains.number_neurons * brains.input_size
-            w_size = brains.number_neurons * brains.number_neurons
-            t_size = brains.output_size * brains.number_neurons
-
-            individuals = rand(number_individuals, individual_size)
+            individuals = randn(number_individuals, individual_size)
             individuals_gpu = CuArray(individuals)
 
-            @cuda threads = brains.number_neurons blocks = number_individuals kernel_test_initialize(individuals_gpu, brains)
+            @cuda threads = brains.number_neurons blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
 
             CUDA.synchronize()
 
@@ -98,9 +92,22 @@ end
 
             for j = 1:number_individuals
 
-                V[:, :, j] = reshape(view(individuals, j, 1:v_size), (brains.number_neurons, brains.input_size))
-                W[:, :, j] = reshape(view(individuals, j, v_size+1:v_size+w_size), (brains.number_neurons, brains.number_neurons))
-                T[:, :, j] = reshape(view(individuals, j, v_size+w_size+1:v_size+w_size+t_size), (brains.output_size, brains.number_neurons))
+                V_size = length(V[:, :, j])
+                W_size = length(W[:, :, j])
+                T_size = length(T[:, :, j])
+    
+                @test V_size + W_size + T_size == individual_size
+ 
+                V[:, :, j] = reshape(view(individuals, j, 1:V_size), (brains.number_neurons, brains.input_size))
+                offset = V_size
+
+                W[:, :, j] = reshape(view(individuals, j, 1+offset:W_size+offset), (brains.number_neurons, brains.number_neurons))
+                offset += W_size
+
+                T[:, :, j] = reshape(view(individuals, j, 1+offset:T_size+offset), (brains.output_size, brains.number_neurons))
+                offset += T_size
+
+                @test offset == individual_size
 
                 if brains.set_principle_diagonal_elements_of_W_negative == true
                     for i = 1:brains.number_neurons
@@ -111,9 +118,9 @@ end
             end
 
             # Test brain initialization
-            @test V ≈ Array(brains.V) atol = 0.00001
-            @test W ≈ Array(brains.W) atol = 0.00001
-            @test T ≈ Array(brains.T) atol = 0.00001
+            @test V ≈ Array(brains.V) rtol = 0.00001
+            @test W ≈ Array(brains.W) rtol = 0.00001
+            @test T ≈ Array(brains.T) rtol = 0.00001
 
             x = zeros(brains.number_neurons, number_individuals)
 
@@ -148,8 +155,11 @@ end
                     # Calculate outputs
                     y = map(tanh, T[:, :, j] * x)
 
-                    @test x[:, j] ≈ Array(brains.x[:, j]) rtol = 0.001
-                    @test y[:, j] ≈ Array(output_gpu[:, j]) rtol = 0.001
+                    @test x[:, j] ≈ Array(brains.x[:, j]) rtol = 0.00001
+                    @test y[:, j] ≈ Array(output_gpu[:, j]) rtol = 0.00001
+
+                    # Take over neural state to make sure that states of both brains do not drift away over time 
+                    x[:, j] = Array(brains.x[:, j])
 
                 end
 
