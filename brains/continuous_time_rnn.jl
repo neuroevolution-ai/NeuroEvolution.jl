@@ -48,6 +48,11 @@ end
 Adapt.@adapt_structure ContinuousTimeRNN
 
 
+function get_memory_required_threads(brains::ContinuousTimeRNN)
+
+    return brains.number_neurons
+end
+
 function get_memory_requirements(brains::ContinuousTimeRNN)
     return sizeof(Float32) * brains.number_neurons
 end

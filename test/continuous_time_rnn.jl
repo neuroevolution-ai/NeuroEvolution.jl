@@ -82,7 +82,9 @@ end
             individuals = randn(number_individuals, individual_size)
             individuals_gpu = CuArray(individuals)
 
-            @cuda threads = brains.number_neurons blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
+            number_threads = get_memory_required_threads(brains)
+
+            @cuda threads = number_threads blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
 
             CUDA.synchronize()
 
@@ -134,7 +136,7 @@ end
 
                 shared_memory = get_memory_requirements(brains) + sizeof(Float32) * (brains.input_size + brains.output_size)
 
-                CUDA.@cuda threads = brains.number_neurons blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, output_gpu, brains)
+                CUDA.@cuda threads = number_threads blocks = number_individuals shmem = shared_memory kernel_test_brain_step(input_gpu, output_gpu, brains)
                 CUDA.synchronize()
 
                 for j = 1:number_individuals
@@ -153,10 +155,10 @@ end
                     x[:, j] = clamp.(x[:, j], brains.clipping_range_min, brains.clipping_range_max)
 
                     # Calculate outputs
-                    y = map(tanh, T[:, :, j] * x)
+                    y = map(tanh, T[:, :, j] * x[:, j])
 
                     @test x[:, j] ≈ Array(brains.x[:, j]) rtol = 0.00001
-                    @test y[:, j] ≈ Array(output_gpu[:, j]) rtol = 0.00001
+                    @test y ≈ Array(output_gpu[:, j]) rtol = 0.00001
 
                     # Take over neural state to make sure that states of both brains do not drift away over time 
                     x[:, j] = Array(brains.x[:, j])
