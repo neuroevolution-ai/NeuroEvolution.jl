@@ -30,8 +30,8 @@ function DummyApp(configuration::OrderedDict, number_individuals::Int)
     for i = 1:4
         for j = 1:4
 
-            x = checkboxes_grid_size * i + checkboxes_border
-            y = checkboxes_grid_size * j + checkboxes_border
+            x = checkboxes_grid_size * (i-1) + checkboxes_border
+            y = checkboxes_grid_size * (j-1) + checkboxes_border
 
             gui_elements_rectangles[n, :] = [x, y, checkboxes_size, checkboxes_size]
             n += 1
