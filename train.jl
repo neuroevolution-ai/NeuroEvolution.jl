@@ -113,7 +113,7 @@ function main()
             environments,
             env_seed = env_seed,
             number_rounds = config.number_rounds,
-            threads = get_required_threads(brains),
+            threads = max(get_required_threads(brains), get_required_threads(environments)),
             blocks = number_individuals,
             shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments),
         )
@@ -130,7 +130,7 @@ function main()
             config.number_validation_runs,
             brains,
             environments,
-            threads = get_required_threads(brains),
+            threads = max(get_required_threads(brains), get_required_threads(environments)),
             blocks = config.number_validation_runs,
             shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments),
         )

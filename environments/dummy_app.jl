@@ -15,20 +15,20 @@ end
 
 function DummyApp(configuration::OrderedDict, number_individuals::Int)
 
-    number_checkboxes = 8
+    number_checkboxes = 16
     number_gui_elements = number_checkboxes + 1
 
     # Initialize Cuda Array for positions of GUI elements
     gui_elements_rectangles = CUDA.fill(0.0, (number_gui_elements, 4))
 
-    checkboxes_size = 20
-    checkboxes_grid_size = 50
-    checkboxes_border = 30
+    checkboxes_size = 100
+    checkboxes_grid_size = 100
+    checkboxes_border = 0
 
     # Place all 8 checkboxes in 4 colums and 2 rows
     n = 1
     for i = 1:4
-        for j = 1:2
+        for j = 1:4
 
             x = checkboxes_grid_size * i + checkboxes_border
             y = checkboxes_grid_size * j + checkboxes_border
@@ -159,6 +159,10 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
     return
 end
 
+function get_required_threads(environments::DummyApp)
+
+    return environments.number_gui_elements
+end
 
 function get_memory_requirements(environments::DummyApp)
     return sizeof(Float32) * environments.number_gui_elements +                             # Reward
