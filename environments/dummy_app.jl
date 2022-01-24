@@ -15,20 +15,22 @@ end
 
 function DummyApp(configuration::OrderedDict, number_individuals::Int)
 
-    number_checkboxes = 16
+    number_checkboxes_horizontal = 8
+    number_checkboxes_vertical = 8
+    number_checkboxes = number_checkboxes_horizontal * number_checkboxes_vertical
     number_gui_elements = number_checkboxes + 1
 
     # Initialize Cuda Array for positions of GUI elements
     gui_elements_rectangles = CUDA.fill(0.0, (number_gui_elements, 4))
 
-    checkboxes_size = 100
-    checkboxes_grid_size = 100
+    checkboxes_size = 50
+    checkboxes_grid_size = 50
     checkboxes_border = 0
 
     # Place all 8 checkboxes in 4 colums and 2 rows
     n = 1
-    for i = 1:4
-        for j = 1:4
+    for i = 1:number_checkboxes_horizontal
+        for j = 1:number_checkboxes_vertical
 
             x = checkboxes_grid_size * (i-1) + checkboxes_border
             y = checkboxes_grid_size * (j-1) + checkboxes_border

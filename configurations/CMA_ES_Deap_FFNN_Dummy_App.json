@@ -5,7 +5,7 @@
   "maximum_env_seed": 100000,
   "environment": {
     "type": "DummyApp",
-    "number_time_steps": 20
+    "number_time_steps": 64
   },
   "brain": {
     "type": "FFNN",
@@ -15,6 +15,6 @@
   "optimizer": {
     "type": "CMA-ES-Deap",
     "population_size": 2000,
-    "sigma": 0.5
+    "sigma": 0.2
   }
 }
