@@ -82,7 +82,7 @@ end
             individuals = randn(number_individuals, individual_size)
             individuals_gpu = CuArray(individuals)
 
-            number_threads = get_memory_required_threads(brains)
+            number_threads = get_required_threads(brains)
 
             @cuda threads = number_threads blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
 

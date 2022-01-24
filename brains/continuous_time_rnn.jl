@@ -48,7 +48,7 @@ end
 Adapt.@adapt_structure ContinuousTimeRNN
 
 
-function get_memory_required_threads(brains::ContinuousTimeRNN)
+function get_required_threads(brains::ContinuousTimeRNN)
 
     return brains.number_neurons
 end

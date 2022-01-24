@@ -34,7 +34,7 @@ end
 Adapt.@adapt_structure FeedForwardNN
 
 
-function get_memory_required_threads(brains::FeedForwardNN)
+function get_required_threads(brains::FeedForwardNN)
 
     return max(brains.hidden_layer1_size, brains.hidden_layer2_size)
 end

@@ -8,6 +8,7 @@ using DataStructures
 include("environments/collect_points.jl")
 include("environments/dummy_app.jl")
 include("brains/continuous_time_rnn.jl")
+include("brains/feed_forward_nn.jl")
 include("optimizers/cma_es.jl")
 include("optimizers/randomizer.jl")
 include("tools/episode_runner.jl")
@@ -40,7 +41,7 @@ end
 
 function main()
 
-    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense_Dummy_App.json"
+    configuration_file = "configurations/CMA_ES_Deap_FFNN_Dummy_App.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
@@ -52,8 +53,13 @@ function main()
     environment_type = DummyApp
 
     # Get brain type from configuration
-    # TODO: Choose brain type from configuration
-    brain_type = ContinuousTimeRNN
+    if configuration["brain"]["type"] == "CTRNN"
+        brain_type = ContinuousTimeRNN
+    elseif configuration["brain"]["type"] == "FFNN"
+        brain_type = FeedForwardNN
+    else
+        error("No valid brain type")
+    end
 
     # Get optimizer type from configuration 
     if configuration["optimizer"]["type"] == "Randomizer"
@@ -83,8 +89,6 @@ function main()
     best_genome_overall = nothing
     best_reward_overall = typemin(Int32)
 
-    required_shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments)
-
     # Get start time of training and date
     start_time_training = now()
 
@@ -109,9 +113,9 @@ function main()
             environments,
             env_seed = env_seed,
             number_rounds = config.number_rounds,
-            threads = brains.number_neurons,
+            threads = get_required_threads(brains),
             blocks = number_individuals,
-            shared_memory = required_shared_memory,
+            shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments),
         )
 
         # Tell optimizer new rewards
@@ -126,9 +130,9 @@ function main()
             config.number_validation_runs,
             brains,
             environments,
-            threads = brains.number_neurons,
+            threads = get_required_threads(brains),
             blocks = config.number_validation_runs,
-            shared_memory = required_shared_memory,
+            shared_memory = get_memory_requirements(brains) + get_memory_requirements(environments),
         )
 
         best_reward_current_generation = mean(rewards_validation)

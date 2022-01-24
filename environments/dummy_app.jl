@@ -44,7 +44,7 @@ function DummyApp(configuration::OrderedDict, number_individuals::Int)
     DummyApp(
         convert(Int32, configuration["number_time_steps"]),
         number_checkboxes,
-        2,
+        4,
         number_checkboxes,
         number_gui_elements,
         gui_elements_rectangles,
@@ -120,10 +120,18 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
         # Brain step
         step(brains, observation, action, offset_shared_memory)
 
-        # Scale actions to click positions
+        
         if threadID <= 2
-            click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0) * 400.0)
+                        
+            # Scale actions to click positions
+            random_number = action[threadID+2] * random_normal()
+            click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0 + random_number) * 400.0)
+            
             #click_position[threadID] = rand(1:400)
+
+            #checkbox = rand(1:environments.number_checkboxes)
+            #click_position[threadID] = environments.gui_elements_rectangles[checkbox, threadID] + 10 
+
         end
 
         sync_threads() 
@@ -205,3 +213,14 @@ function is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
 
     return rect_x <= point_x <= (rect_x + width) && rect_y <= point_y <= (rect_y + height)
 end
+
+# https://www.baeldung.com/cs/uniform-to-normal-distribution
+function random_normal()
+
+    u1 = rand()
+    u2 = rand()
+
+    return sqrt(-2*log(u1)) * cos(2*pi*u2)
+
+end
+
