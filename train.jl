@@ -75,8 +75,8 @@ function main()
     # Initialize environments
     environments = environment_type(config.environment, number_individuals)
 
-    number_inputs = get_number_inputs(environments)
-    number_outputs = get_number_outputs(environments)
+    number_inputs = get_number_observations(environments)
+    number_outputs = get_number_actions(environments)
 
     # Initialize brains 
     brains = brain_type(config.brain, number_inputs, number_outputs, number_individuals)

@@ -5,8 +5,8 @@ using DataStructures
 
 struct DummyApp{A,B}
     number_time_steps::Int32
-    number_inputs::Int64
-    number_outputs::Int64
+    number_observations::Int64
+    number_actions::Int64
     number_checkboxes::Int64
     number_gui_elements::Int64
     gui_elements_rectangles::A
@@ -70,17 +70,17 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    observation = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
+    observation = @cuDynamicSharedMem(Float32, environments.number_observations, offset_shared_memory)
     offset_shared_memory += sizeof(observation)
 
     sync_threads()
 
-    action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset_shared_memory)
+    action = @cuDynamicSharedMem(Float32, environments.number_actions, offset_shared_memory)
     offset_shared_memory += sizeof(action)
 
     sync_threads()
 
-    click_position = @cuDynamicSharedMem(Int32, environments.number_outputs, offset_shared_memory)
+    click_position = @cuDynamicSharedMem(Int32, environments.number_actions, offset_shared_memory)
     offset_shared_memory += sizeof(click_position)
 
     sync_threads()
@@ -168,17 +168,17 @@ end
 
 function get_memory_requirements(environments::DummyApp)
     return sizeof(Float32) * environments.number_gui_elements +                             # Reward
-           sizeof(Float32) * (environments.number_inputs + environments.number_outputs) +   # Observation + Action
+           sizeof(Float32) * (environments.number_observations + environments.number_actions) +   # Observation + Action
            sizeof(Int32) * environments.number_gui_elements                                 # States of gui elements
 
 end
 
-function get_number_inputs(environments::DummyApp)
-    return environments.number_inputs
+function get_number_observations(environments::DummyApp)
+    return environments.number_observations
 end
 
-function get_number_outputs(environments::DummyApp)
-    return environments.number_outputs
+function get_number_actions(environments::DummyApp)
+    return environments.number_actions
 end
 
 function process_click(environments, point, gui_elements_states, reward)
