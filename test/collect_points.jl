@@ -22,7 +22,7 @@ function kernel_test_initialize(environments, env_seed, number_individuals)
     return
 end
 
-function kernel_test_step(actions, action, observations, environments, env_seed, number_individuals)
+function kernel_test_step(actions, observations, rewards, environments, env_seed, number_individuals)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -32,12 +32,12 @@ function kernel_test_step(actions, action, observations, environments, env_seed,
     input[2] = actions[2, bx]
     offset = sizeof(input)
     sync_threads()
-
+    
     rng_states = @cuDynamicSharedMem(Int64, number_individuals)
     offset += sizeof(rng_states)
     sync_threads()
 
-    step(tx, bx, input, observations, offset, environments, rng_states)
+    step(tx, bx, input, observations, rewards, offset, environments, rng_states)
 
     return
 end
@@ -142,6 +142,7 @@ end
     #Step function tests
     #---------------------------------------------------------------------------------------------------------------
 
+    rewards = CUDA.fill(0, number_individuals)
     observations = CUDA.fill(0.0f0, (10, number_individuals))
 
 
@@ -151,7 +152,7 @@ end
 
     original_agents_positions = Array(environments.agents_positions)
 
-    action = CUDA.fill(0.0f0, 2)
+    #Testing agent movements
     actions = rand(Uniform(-1, 1),(2, number_individuals))
 
     new_agents_position = Array(environments.agents_positions) 
@@ -161,14 +162,41 @@ end
         new_agents_position[2, i] += convert(Int, round(clamp(actions[2, i] * mr, -mr, mr)))
     end  
 
-    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), action, observations, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
 
     CUDA.synchronize()
 
     @test Array(environments.agents_positions) == new_agents_position
-    
 
+    #Tests wether points are collected properly
 
+    #positive points
+    copyto!(environments.agents_positions, original_agents_positions)
+
+    pos_point_positions = original_agents_positions .+= environments.agent_movement_range
+    copyto!(environments.positive_points_positions, pos_point_positions)
+
+    fill!(actions, 1)
+
+    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+
+    @test pos_point_positions != Array(environments.positive_points_positions)
+
+    @test Array(rewards) == fill(environments.reward_per_collected_positive_point, number_individuals)
+
+    #negative points
+    copyto!(environments.agents_positions, original_agents_positions)
+
+    neg_point_positions = original_agents_positions .-= environments.agent_movement_range
+    copyto!(environments.negative_points_positions, neg_point_positions)
+
+    fill!(actions, -1)
+
+    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+
+    @test neg_point_positions != Array(environments.negative_points_positions)
+
+    @test Array(rewards) == fill(environments.reward_per_collected_positive_point + environments.reward_per_collected_negative_point, number_individuals)
 
     
 end
