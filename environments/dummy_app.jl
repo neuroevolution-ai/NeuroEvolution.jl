@@ -95,13 +95,6 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    # Initialize states of gui elements
-    if threadID <= environments.number_gui_elements
-        gui_elements_states[threadID] = 0
-    end
-
-    sync_threads()
-
     # Initialize rewards 
     if threadID <= environments.number_gui_elements
         reward[threadID] = 0.0
@@ -109,44 +102,54 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    # Iterate over given number of time steps
-    for time_step = 1:environments.number_time_steps
+    for i in 1:number_rounds
 
-        # Set observations
-        if threadID <= environments.number_checkboxes
-            observation[threadID] = gui_elements_states[threadID]
-        end
+    # Initialize states of gui elements
+    if threadID <= environments.number_gui_elements
+        gui_elements_states[threadID] = 0
+    end
 
-        sync_threads()
+    sync_threads()
 
-        # Brain step
-        step(brains, observation, action, offset_shared_memory)
+        # Iterate over given number of time steps
+        for time_step = 1:environments.number_time_steps
+
+            # Set observations
+            if threadID <= environments.number_checkboxes
+                observation[threadID] = gui_elements_states[threadID]
+            end
+
+            sync_threads()
+
+            # Brain step
+            step(brains, observation, action, offset_shared_memory)
 
         
-        if threadID <= 2
+            if threadID <= 2
                         
-            # Scale actions to click positions
-            random_number = action[threadID+2] * random_normal()
-            click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0 + random_number) * 400.0)
+                # Scale actions to click positions
+                random_number = action[threadID+2] * random_normal()
+                click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0 + random_number) * 400.0)
             
-            #click_position[threadID] = rand(1:400)
+                #click_position[threadID] = rand(1:400)
 
-            #checkbox = rand(1:environments.number_checkboxes)
-            #click_position[threadID] = environments.gui_elements_rectangles[checkbox, threadID] + 10 
+                #checkbox = rand(1:environments.number_checkboxes)
+                #click_position[threadID] = environments.gui_elements_rectangles[checkbox, threadID] + 10 
 
-        end
+            end
 
-        sync_threads() 
+            sync_threads()
 
-        #if blockID == 1 && threadID == 1
-        #    @cuprintln("tx=", threadID,"   action_x=", action[1], "  action_y=", action[2])
-        #end       
+            #if blockID == 1 && threadID == 1
+            #    @cuprintln("tx=", threadID,"   action_x=", action[1], "  action_y=", action[2])
+            #end   
 
-        # Process mouse click
-        process_click(environments, click_position, gui_elements_states, reward)
+            # Process mouse click
+            process_click(environments, click_position, gui_elements_states, reward)
 
-        sync_threads()
+            sync_threads()
     
+        end
     end
 
     # Transfer rewards to output vector
@@ -156,6 +159,8 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
         for i in 1:environments.number_gui_elements
             rewards[blockID] += reward[i]
         end
+
+        rewards[blockID] /= number_rounds
     end
 
     return
