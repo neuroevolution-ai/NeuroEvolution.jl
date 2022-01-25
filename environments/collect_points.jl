@@ -83,16 +83,16 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
 
 end
 
-function step(threadID, blockID, action, observations, offset, environments::CollectPoints, rng_states)
+function step(threadID, blockID, action, observations, rewards, offset, environments::CollectPoints, rng_states)
 
     if threadID == 1 
         move_range = environments.agent_movement_range
         maze_width = environments.maze_cell_size * environments.maze_rows
         maze_heigth = environments.maze_cell_size * environments.maze_columns
 
-        
+            
         # Move agent
-        environments.agents_positions[1, blockID] += convert(Int, round(clamp(action[1, ] * move_range, -move_range, move_range)))
+        environments.agents_positions[1, blockID] += convert(Int, round(clamp(action[1] * move_range, -move_range, move_range)))
         environments.agents_positions[2, blockID] += convert(Int, round(clamp(action[2] * move_range, -move_range, move_range)))
 
         environments.agents_positions[2, blockID] = max(environments.agents_positions[2, blockID], environments.agent_radius)  # Upper border
@@ -141,8 +141,8 @@ function step(threadID, blockID, action, observations, offset, environments::Col
 
         #Calculate new Sensor distances
         calculate_sensor_distance(blockID, cell_x, cell_y, environments)
-
-        reward = 0.0 
+        
+        reward = 0.0
         
         # Collect positive point in reach
         distance = sqrt((environments.positive_points_positions[1, blockID] - environments.agents_positions[1, blockID])^2 + (environments.positive_points_positions[2, blockID] - environments.agents_positions[2, blockID])^2)
@@ -163,6 +163,8 @@ function step(threadID, blockID, action, observations, offset, environments::Col
                 @cuprintln("reward: $reward")
             end    
         end
+        
+        rewards[blockID] += reward
         
         get_observations(threadID, blockID, observations, environments)
     end
