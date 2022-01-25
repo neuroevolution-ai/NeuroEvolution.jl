@@ -20,20 +20,22 @@ function kernel_test_initialize(environments, env_seed, number_individuals)
     return
 end
 
-function kernel_test_collect_points(action, observations, environments, env_seed, number_individuals)
+function kernel_test_step(actions, observations, rewards, environments, env_seed, number_individuals)
 
     tx = threadIdx().x
     bx = blockIdx().x
 
     input = @cuDynamicSharedMem(Float32, environments.number_inputs)
+    input[1] = actions[1, bx]
+    input[2] = actions[2, bx]
     offset = sizeof(input)
     sync_threads()
-
+    
     rng_states = @cuDynamicSharedMem(Int64, number_individuals)
     offset += sizeof(rng_states)
     sync_threads()
 
-    step(tx, bx, action, observations, offset, environments, rng_states)
+    step(tx, bx, input, observations, rewards, offset, environments, rng_states)
 
     return
 end
@@ -70,11 +72,12 @@ function main()
     height = environments.maze_columns * environments.maze_cell_size
 
     observations = CUDA.fill(0.0f0, (10, number_individuals))
+    rewards = CUDA.fill(0, number_individuals)
 
     @play width height number_iterations begin
 
-        action = CuArray(rand(Uniform(-1.0, 1.0), 2))
-        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_collect_points(action, observations, environments, env_seed, number_individuals)
+        actions = CuArray(rand(Uniform(-1, 1),(2, number_individuals)))
+        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(actions, observations, rewards, environments, env_seed, number_individuals)
 
         CUDA.synchronize()
 
