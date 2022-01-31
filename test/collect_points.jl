@@ -56,6 +56,7 @@ end
     config_environment["reward_per_collected_positive_point"] = 500.0
     config_environment["reward_per_collected_negative_point"] = -700.0
     config_environment["number_time_steps"] = 1000
+    config_environment["number_sensors"] = 10
 
     env_seed = rand(1:1000)
     number_individuals = 100
@@ -65,7 +66,7 @@ end
     shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs + sizeof(Int64) * number_individuals
 
     #---------------------------------------------------------------------------------------------------------------
-    #Maze initialization tests
+    # Maze initialization tests
     #---------------------------------------------------------------------------------------------------------------
 
     CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, number_individuals)
@@ -139,7 +140,7 @@ end
     @test Array(environments.maze_walls_east) != maze_walls_east_cpu
 
     #---------------------------------------------------------------------------------------------------------------
-    #Step function tests
+    # Step function tests
     #---------------------------------------------------------------------------------------------------------------
 
     rewards = CUDA.fill(0, number_individuals)
@@ -169,6 +170,7 @@ end
     @test Array(environments.agents_positions) == new_agents_position
 
     #Tests wether points are collected properly
+    rewards = CUDA.fill(0, number_individuals)
 
     #positive points
     copyto!(environments.agents_positions, original_agents_positions)

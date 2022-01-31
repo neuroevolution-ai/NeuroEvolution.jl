@@ -3,10 +3,11 @@ using Adapt
 using DataStructures
 using Random
 using Distributions
+using LinearAlgebra
 
 include("../tools/linear_congruential_generator.jl")
 
-struct CollectPoints{A,B,C}
+struct CollectPoints{A,B,C,D}
 
     maze_columns::Int64
     maze_rows::Int64
@@ -17,6 +18,7 @@ struct CollectPoints{A,B,C}
     reward_per_collected_positive_point::Float32
     reward_per_collected_negative_point::Float32
     number_time_steps::Int32
+    number_sensors::Int32
     number_inputs::Int64
     number_outputs::Int64
     maze_walls_north::A
@@ -28,6 +30,8 @@ struct CollectPoints{A,B,C}
     positive_points_positions::B
     negative_points_positions::B
     sensor_distances::C
+    ray_directions::D
+    ray_cell_distances::D
 
 end
 
@@ -43,6 +47,7 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Float32, configuration["reward_per_collected_positive_point"]),
         convert(Float32, configuration["reward_per_collected_negative_point"]),
         convert(Int32, configuration["number_time_steps"]),
+        convert(Int32, configuration["number_sensors"]),
         2,
         10,
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
@@ -54,6 +59,8 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (4, number_individuals)),
+        CUDA.fill(0.0f0, (2, configuration["number_sensors"], number_individuals)),
+        CUDA.fill(0.0f0, (2, configuration["number_sensors"], number_individuals)),
     )
 end
 
@@ -76,10 +83,14 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
         cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
         cell_y = convert(Int, ceil(environments.agents_positions[2, blockID] / environments.maze_cell_size))
         calculate_sensor_distance(blockID, cell_x, cell_y, environments)
-
     end
 
-    return
+    #Initialize rays
+    angle_diff_per_ray = 360 / environments.number_sensors
+
+    if threadID <= environments.number_sensors
+        init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)
+    end
 
 end
 
@@ -443,6 +454,43 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset, rng
         nv += 1
     end
     
+end
+
+#Calculates the distance, the ray has to travel to reach the next cell for each dimension seperatly
+function init_ray(sensor_number, individual, init_x, init_y, angle_diff_per_ray, environments::CollectPoints)
+
+    #calulating the ray dircetion by rotating an initial ray direction in respect to the sensor number
+    angle_diff_per_ray = deg2rad(sensor_number * angle_diff_per_ray)
+    sine = sin(angle_diff_per_ray)
+    cosine = cos(angle_diff_per_ray)
+
+    environments.ray_directions[1, sensor_number, individual] = cosine * init_x + (-sine) * init_y
+    environments.ray_directions[2, sensor_number, individual] = sine * init_x + cosine * init_y
+
+    norm = sqrt(environments.ray_directions[1, sensor_number, individual]^2 + environments.ray_directions[2, sensor_number, individual]^2)
+
+    #Normalization (if initial ray is always already normalized this is redundant)
+    environments.ray_directions[1, sensor_number, individual] = environments.ray_directions[1, sensor_number, individual] / norm 
+    environments.ray_directions[2, sensor_number, individual] = environments.ray_directions[2, sensor_number, individual] / norm  
+    
+    #If direction is zero for a dimension, the dimension is ignored by setting a high distance
+    if -1e-10 < environments.ray_directions[1, sensor_number, individual] < 1e-10  
+        environments.ray_directions[1, sensor_number, individual] = 0.0
+        environments.ray_cell_distances[1, sensor_number, individual] = Inf32
+    else
+        environments.ray_cell_distances[1, sensor_number, individual] = sqrt(1 + (environments.ray_directions[2, sensor_number, individual] / environments.ray_directions[1, sensor_number, individual]) * (environments.ray_directions[2, sensor_number, individual] / environments.ray_directions[1, sensor_number, individual]))
+    end
+
+    if -1e-10 < environments.ray_directions[2, sensor_number, individual] < 1e-10 
+        environments.ray_directions[2, sensor_number, individual] = 0.0
+        environments.ray_cell_distances[2, sensor_number, individual] = Inf32
+    else 
+        environments.ray_cell_distances[2, sensor_number, individual] = sqrt(1 + (environments.ray_directions[1, sensor_number, individual] / environments.ray_directions[2, sensor_number, individual]) * (environments.ray_directions[1, sensor_number, individual] / environments.ray_directions[2, sensor_number, individual]))   
+    end
+    
+    environments.ray_cell_distances[1, sensor_number, individual] *= environments.maze_cell_size 
+    environments.ray_cell_distances[2, sensor_number, individual] *= environments.maze_cell_size
+
 end
 
 # Return a list of unvisited neighbours to cell
