@@ -50,7 +50,7 @@ Adapt.@adapt_structure ContinuousTimeRNN
 
 function get_required_threads(brains::ContinuousTimeRNN)
 
-    return brains.number_neurons
+    return max(brains.number_neurons, brains.output_size)
 end
 
 function get_memory_requirements(brains::ContinuousTimeRNN)
@@ -176,7 +176,7 @@ function step(brains::ContinuousTimeRNN, input, output, offset_shared_memory)
 
 end
 
-function get_free_parameter_usage(brains)
+function get_free_parameter_usage(brains::ContinuousTimeRNN)
 
     usage_dict = Dict()
 
@@ -187,7 +187,7 @@ function get_free_parameter_usage(brains)
     return usage_dict
 end
 
-function get_individual_size(brains)
+function get_individual_size(brains::ContinuousTimeRNN)
 
     usage_dict = get_free_parameter_usage(brains)
 

@@ -150,7 +150,7 @@ function step(brains::FeedForwardNN, input, output, offset_shared_memory)
 end
 
 
-function get_free_parameter_usage(brains)
+function get_free_parameter_usage(brains::FeedForwardNN)
 
     usage_dict = Dict()
 
@@ -164,9 +164,9 @@ function get_free_parameter_usage(brains)
     return usage_dict
 end
 
-function get_individual_size(brains)
+function get_individual_size(brains::FeedForwardNN)
 
-    usage_dict = get_free_parameter_usage(brains)
+    usage_dict = get_free_parameter_usage(brains::FeedForwardNN)
 
     return usage_dict["W1"] +
            usage_dict["W2"] +

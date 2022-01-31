@@ -15,16 +15,16 @@ end
 
 function DummyApp(configuration::OrderedDict, number_individuals::Int)
 
-    number_checkboxes_horizontal = 8
-    number_checkboxes_vertical = 8
+    number_checkboxes_horizontal = 5
+    number_checkboxes_vertical = 5
     number_checkboxes = number_checkboxes_horizontal * number_checkboxes_vertical
     number_gui_elements = number_checkboxes + 1
 
     # Initialize Cuda Array for positions of GUI elements
     gui_elements_rectangles = CUDA.fill(0.0, (number_gui_elements, 4))
 
-    checkboxes_size = 50
-    checkboxes_grid_size = 50
+    checkboxes_size = 80
+    checkboxes_grid_size = 80
     checkboxes_border = 0
 
     # Place all 8 checkboxes in 4 colums and 2 rows
@@ -46,7 +46,7 @@ function DummyApp(configuration::OrderedDict, number_individuals::Int)
     DummyApp(
         convert(Int32, configuration["number_time_steps"]),
         number_checkboxes,
-        4,
+        2,
         number_checkboxes,
         number_gui_elements,
         gui_elements_rectangles,
@@ -111,6 +111,10 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
+    reset(brains)
+
+    sync_threads()
+
         # Iterate over given number of time steps
         for time_step = 1:environments.number_time_steps
 
@@ -128,8 +132,8 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
             if threadID <= 2
                         
                 # Scale actions to click positions
-                random_number = action[threadID+2] * random_normal()
-                click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0 + random_number) * 400.0)
+                #random_number = action[threadID+2] * random_normal()
+                click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0) * 400.0)
             
                 #click_position[threadID] = rand(1:400)
 
@@ -226,6 +230,7 @@ function is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
 end
 
 # https://www.baeldung.com/cs/uniform-to-normal-distribution
+# TODO randn() should work now on the gpu in the latest CUDA.jl version
 function random_normal()
 
     u1 = rand()
