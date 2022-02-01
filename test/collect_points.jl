@@ -56,7 +56,7 @@ end
     config_environment["reward_per_collected_positive_point"] = 500.0
     config_environment["reward_per_collected_negative_point"] = -700.0
     config_environment["number_time_steps"] = 1000
-    config_environment["number_sensors"] = 10
+    config_environment["number_sensors"] = 2
 
     env_seed = rand(1:1000)
     number_individuals = 100

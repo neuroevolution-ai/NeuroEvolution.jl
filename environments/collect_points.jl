@@ -58,7 +58,7 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
         CUDA.fill(0, (2, number_individuals)),
-        CUDA.fill(0, (4, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_sensors"], number_individuals)),
         CUDA.fill(0.0f0, (2, configuration["number_sensors"], number_individuals)),
         CUDA.fill(0.0f0, (2, configuration["number_sensors"], number_individuals)),
     )
@@ -82,14 +82,14 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
         #Calculate initial Sensor distances
         cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
         cell_y = convert(Int, ceil(environments.agents_positions[2, blockID] / environments.maze_cell_size))
-        calculate_sensor_distance(blockID, cell_x, cell_y, environments)
+        #calculate_sensor_distance(blockID, cell_x, cell_y, environments)
     end
 
     #Initialize rays
     angle_diff_per_ray = 360 / environments.number_sensors
-
+    
     if threadID <= environments.number_sensors
-        init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)
+        init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)  
     end
 
 end
@@ -150,8 +150,7 @@ function step(threadID, blockID, action, observations, rewards, offset, environm
             environments.agents_positions[2, blockID] = cell_bottom - environments.agent_radius
         end
 
-        #Calculate new Sensor distances
-        calculate_sensor_distance(blockID, cell_x, cell_y, environments)
+        #calculate_sensor_distance(blockID, cell_x, cell_y, environments)
         
         reward = 0.0
         
@@ -176,8 +175,13 @@ function step(threadID, blockID, action, observations, rewards, offset, environm
         end
         
         rewards[blockID] += reward
-        
-        get_observations(threadID, blockID, observations, environments)
+        #get_observations(threadID, blockID, observations, environments)
+    end
+
+    sync_threads()
+
+    if threadID <= environments.number_sensors
+        calculate_ray_distance(threadID, blockID, environments)
     end
 end
 
@@ -323,22 +327,16 @@ function render(environments::CollectPoints, individual)
     setdash("dot")
     sensor_distances = Array(environments.sensor_distances[:, individual])
 
-    #North
-    if sensor_distances[1] > environments.agent_radius
-        line(Point(agent_position[1], agent_position[2] - environments.agent_radius), Point(agent_position[1], agent_position[2] - sensor_distances[1] - environments.agent_radius), :stroke)
-    end    
-    #South
-    if sensor_distances[2] > environments.agent_radius
-        line(Point(agent_position[1], agent_position[2] + environments.agent_radius), Point(agent_position[1], agent_position[2] + sensor_distances[2] + environments.agent_radius), :stroke)
-    end
-    #East
-    if sensor_distances[3] > environments.agent_radius
-        line(Point(agent_position[1] + environments.agent_radius, agent_position[2]), Point(agent_position[1] + sensor_distances[3] + environments.agent_radius, agent_position[2]), :stroke)
-    end
-    #West
-    if sensor_distances[4] > environments.agent_radius
-        line(Point(agent_position[1] - environments.agent_radius, agent_position[2]), Point(agent_position[1] - sensor_distances[4] - environments.agent_radius, agent_position[2]), :stroke)
-    end       
+    angle_per_ray = 360 / environments.number_sensors
+    
+    for i = 1:environments.number_sensors
+        angle_diff = deg2rad(angle_per_ray * i)
+        colission_point = Point(agent_position[1] + sensor_distances[i] * cos(angle_diff), agent_position[2] - sensor_distances[i] * sin(angle_diff))
+        agent_point = Point(agent_position[1] + environments.agent_radius * cos(angle_diff), agent_position[2] -  environments.agent_radius * sin(angle_diff))
+        if sensor_distances[i] > environments.agent_radius
+            line(agent_point, colission_point, :stroke)
+        end 
+    end            
 
 
     # Draw maze
@@ -493,7 +491,69 @@ function init_ray(sensor_number, individual, init_x, init_y, angle_diff_per_ray,
 
 end
 
-# Return a list of unvisited neighbours to cell
+#Performs the DDA algorithm for a given ray
+function calculate_ray_distance(sensor_number, individual, environments::CollectPoints)
+    current_cell_x = convert(Int, ceil(environments.agents_positions[1, individual] / environments.maze_cell_size)) 
+    current_cell_y = convert(Int, ceil(environments.agents_positions[2, individual] / environments.maze_cell_size))
+
+    cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(current_cell_x, current_cell_y, environments.maze_cell_size)
+    test = environments.ray_cell_distances[2, sensor_number, individual]
+
+    if environments.ray_directions[1, sensor_number, individual] < 0.0
+        step_direction_x = -1
+        ray_length_x = (environments.agents_positions[1, individual] - cell_left) / environments.maze_cell_size
+        ray_length_x *= environments.ray_cell_distances[1, sensor_number, individual]
+        maze_walls_x = environments.maze_walls_west
+    else
+        step_direction_x = 1
+        ray_length_x = 1 - ((environments.agents_positions[1, individual] - cell_left) / environments.maze_cell_size)
+        ray_length_x *= environments.ray_cell_distances[1, sensor_number, individual]
+        maze_walls_x = environments.maze_walls_east
+    end
+    
+    if environments.ray_directions[2, sensor_number, individual] < 0.0
+        step_direction_y = 1
+        ray_length_y = 1 - ((environments.agents_positions[2, individual] - cell_top) / environments.maze_cell_size)
+        ray_length_y *= environments.ray_cell_distances[2, sensor_number, individual]
+        maze_walls_y = environments.maze_walls_south
+    else
+        step_direction_y = -1
+        ray_length_y = (environments.agents_positions[2, individual] - cell_top) / environments.maze_cell_size
+        test = environments.ray_cell_distances[2, sensor_number, individual]
+        ray_length_y *= environments.ray_cell_distances[2, sensor_number, individual]
+        maze_walls_y = environments.maze_walls_north
+    end
+
+    #DDA
+    hit = false
+    current_distance = 0.0
+    side = 0
+
+    while !hit
+        if ray_length_x < ray_length_y
+            current_distance = ray_length_x
+            ray_length_x += environments.ray_cell_distances[1, sensor_number, individual]
+            side = 1
+            maze_walls = maze_walls_x   
+        else
+            current_distance = ray_length_y 
+            ray_length_y += environments.ray_cell_distances[2, sensor_number, individual]
+            side = 2
+            maze_walls = maze_walls_y
+        end
+      
+        if maze_walls[current_cell_x, current_cell_y, individual]
+            hit = true
+        else
+            side == 1 ? current_cell_x += step_direction_x : current_cell_y += step_direction_y 
+        end      
+    end
+
+    current_distance -= environments.agent_radius
+    environments.sensor_distances[sensor_number, individual] = current_distance
+end
+
+# Returns a list of unvisited neighbours to cell
 function find_valid_neighbors(blockID, cell_x, cell_y, neighbours, environments::CollectPoints)
 
     number_neighbours = 0
