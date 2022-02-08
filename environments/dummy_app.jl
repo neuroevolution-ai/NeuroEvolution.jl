@@ -5,8 +5,8 @@ using DataStructures
 
 struct DummyApp{A,B}
     number_time_steps::Int32
-    number_inputs::Int64
-    number_outputs::Int64
+    number_observations::Int64
+    number_actions::Int64
     number_checkboxes::Int64
     number_gui_elements::Int64
     gui_elements_rectangles::A
@@ -15,23 +15,25 @@ end
 
 function DummyApp(configuration::OrderedDict, number_individuals::Int)
 
-    number_checkboxes = 8
+    number_checkboxes_horizontal = 5
+    number_checkboxes_vertical = 5
+    number_checkboxes = number_checkboxes_horizontal * number_checkboxes_vertical
     number_gui_elements = number_checkboxes + 1
 
     # Initialize Cuda Array for positions of GUI elements
     gui_elements_rectangles = CUDA.fill(0.0, (number_gui_elements, 4))
 
-    checkboxes_size = 20
-    checkboxes_grid_size = 50
-    checkboxes_border = 30
+    checkboxes_size = 80
+    checkboxes_grid_size = 80
+    checkboxes_border = 0
 
     # Place all 8 checkboxes in 4 colums and 2 rows
     n = 1
-    for i = 1:4
-        for j = 1:2
+    for i = 1:number_checkboxes_horizontal
+        for j = 1:number_checkboxes_vertical
 
-            x = checkboxes_grid_size * i + checkboxes_border
-            y = checkboxes_grid_size * j + checkboxes_border
+            x = checkboxes_grid_size * (i-1) + checkboxes_border
+            y = checkboxes_grid_size * (j-1) + checkboxes_border
 
             gui_elements_rectangles[n, :] = [x, y, checkboxes_size, checkboxes_size]
             n += 1
@@ -68,17 +70,17 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    observation = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
+    observation = @cuDynamicSharedMem(Float32, environments.number_observations, offset_shared_memory)
     offset_shared_memory += sizeof(observation)
 
     sync_threads()
 
-    action = @cuDynamicSharedMem(Float32, environments.number_outputs, offset_shared_memory)
+    action = @cuDynamicSharedMem(Float32, environments.number_actions, offset_shared_memory)
     offset_shared_memory += sizeof(action)
 
     sync_threads()
 
-    click_position = @cuDynamicSharedMem(Int32, environments.number_outputs, offset_shared_memory)
+    click_position = @cuDynamicSharedMem(Int32, environments.number_actions, offset_shared_memory)
     offset_shared_memory += sizeof(click_position)
 
     sync_threads()
@@ -93,13 +95,6 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    # Initialize states of gui elements
-    if threadID <= environments.number_gui_elements
-        gui_elements_states[threadID] = 0
-    end
-
-    sync_threads()
-
     # Initialize rewards 
     if threadID <= environments.number_gui_elements
         reward[threadID] = 0.0
@@ -107,36 +102,58 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
 
     sync_threads()
 
-    # Iterate over given number of time steps
-    for time_step = 1:environments.number_time_steps
+    for i in 1:number_rounds
 
-        # Set observations
-        if threadID <= environments.number_checkboxes
-            observation[threadID] = gui_elements_states[threadID]
-        end
+    # Initialize states of gui elements
+    if threadID <= environments.number_gui_elements
+        gui_elements_states[threadID] = 0
+    end
 
-        sync_threads()
+    sync_threads()
 
-        # Brain step
-        step(brains, observation, action, offset_shared_memory)
+    reset(brains)
 
-        # Scale actions to click positions
-        if threadID <= 2
-            click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0) * 400.0)
-            #click_position[threadID] = rand(1:400)
-        end
+    sync_threads()
 
-        sync_threads() 
+        # Iterate over given number of time steps
+        for time_step = 1:environments.number_time_steps
 
-        #if blockID == 1 && threadID == 1
-        #    @cuprintln("tx=", threadID,"   action_x=", action[1], "  action_y=", action[2])
-        #end       
+            # Set observations
+            if threadID <= environments.number_checkboxes
+                observation[threadID] = gui_elements_states[threadID]
+            end
 
-        # Process mouse click
-        process_click(environments, click_position, gui_elements_states, reward)
+            sync_threads()
 
-        sync_threads()
+            # Brain step
+            step(brains, observation, action, offset_shared_memory)
+
+        
+            if threadID <= 2
+                        
+                # Scale actions to click positions
+                #random_number = action[threadID+2] * random_normal()
+                click_position[threadID] = trunc(0.5 * (action[threadID] + 1.0) * 400.0)
+            
+                #click_position[threadID] = rand(1:400)
+
+                #checkbox = rand(1:environments.number_checkboxes)
+                #click_position[threadID] = environments.gui_elements_rectangles[checkbox, threadID] + 10 
+
+            end
+
+            sync_threads()
+
+            #if blockID == 1 && threadID == 1
+            #    @cuprintln("tx=", threadID,"   action_x=", action[1], "  action_y=", action[2])
+            #end   
+
+            # Process mouse click
+            process_click(environments, click_position, gui_elements_states, reward)
+
+            sync_threads()
     
+        end
     end
 
     # Transfer rewards to output vector
@@ -146,25 +163,31 @@ function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rou
         for i in 1:environments.number_gui_elements
             rewards[blockID] += reward[i]
         end
+
+        rewards[blockID] /= number_rounds
     end
 
     return
 end
 
+function get_required_threads(environments::DummyApp)
+
+    return environments.number_gui_elements
+end
 
 function get_memory_requirements(environments::DummyApp)
     return sizeof(Float32) * environments.number_gui_elements +                             # Reward
-           sizeof(Float32) * (environments.number_inputs + environments.number_outputs) +   # Observation + Action
+           sizeof(Float32) * (environments.number_observations + environments.number_actions) +   # Observation + Action
            sizeof(Int32) * environments.number_gui_elements                                 # States of gui elements
 
 end
 
-function get_number_inputs(environments::DummyApp)
-    return environments.number_inputs
+function get_number_observations(environments::DummyApp)
+    return environments.number_observations
 end
 
-function get_number_outputs(environments::DummyApp)
-    return environments.number_outputs
+function get_number_actions(environments::DummyApp)
+    return environments.number_actions
 end
 
 function process_click(environments, point, gui_elements_states, reward)
@@ -205,3 +228,15 @@ function is_point_in_rect(point_x, point_y, rect_x, rect_y, width, height)
 
     return rect_x <= point_x <= (rect_x + width) && rect_y <= point_y <= (rect_y + height)
 end
+
+# https://www.baeldung.com/cs/uniform-to-normal-distribution
+# TODO randn() should work now on the gpu in the latest CUDA.jl version
+function random_normal()
+
+    u1 = rand()
+    u2 = rand()
+
+    return sqrt(-2*log(u1)) * cos(2*pi*u2)
+
+end
+
