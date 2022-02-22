@@ -54,7 +54,7 @@ function main()
     config_environment["reward_per_collected_positive_point"] = 500.0
     config_environment["reward_per_collected_negative_point"] = -700.0
     config_environment["number_time_steps"] = 1000
-    config_environment["number_sensors"] = 4
+    config_environment["number_sensors"] = 10
 
     env_seed = rand(1:1000)
     
@@ -71,8 +71,7 @@ function main()
     number_iterations = 1000
     width = environments.maze_rows * environments.maze_cell_size
     height = environments.maze_columns * environments.maze_cell_size
-
-    observations = CUDA.fill(0.0f0, (10, number_individuals))
+    observations = CUDA.fill(0.0f0, (environments.number_outputs, number_individuals))
     rewards = CUDA.fill(0, number_individuals)
 
     @play width height number_iterations begin

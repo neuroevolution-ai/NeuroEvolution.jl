@@ -144,7 +144,7 @@ end
     #---------------------------------------------------------------------------------------------------------------
 
     rewards = CUDA.fill(0, number_individuals)
-    observations = CUDA.fill(0.0f0, (10, number_individuals))
+    observations = CUDA.fill(0.0f0, (environments.number_outputs, number_individuals))
 
 
     mr = environments.agent_movement_range

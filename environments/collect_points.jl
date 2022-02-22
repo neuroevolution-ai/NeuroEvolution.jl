@@ -49,7 +49,7 @@ function CollectPoints(configuration::OrderedDict, number_individuals::Int)
         convert(Int32, configuration["number_time_steps"]),
         convert(Int32, configuration["number_sensors"]),
         2,
-        10,
+        convert(Int32, configuration["number_sensors"]) + 6,
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
         CUDA.fill(true, (configuration["maze_rows"], configuration["maze_columns"], number_individuals)),
@@ -82,7 +82,6 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
         #Calculate initial Sensor distances
         cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
         cell_y = convert(Int, ceil(environments.agents_positions[2, blockID] / environments.maze_cell_size))
-        #calculate_sensor_distance(blockID, cell_x, cell_y, environments)
     end
 
     #Initialize rays
@@ -149,8 +148,6 @@ function step(threadID, blockID, action, observations, rewards, offset, environm
             environments.agents_positions[1, blockID] = cell_left + environments.agent_radius
             environments.agents_positions[2, blockID] = cell_bottom - environments.agent_radius
         end
-
-        #calculate_sensor_distance(blockID, cell_x, cell_y, environments)
         
         reward = 0.0
         
@@ -175,36 +172,37 @@ function step(threadID, blockID, action, observations, rewards, offset, environm
         end
         
         rewards[blockID] += reward
-        #get_observations(threadID, blockID, observations, environments)
     end
 
     sync_threads()
 
     if threadID <= environments.number_sensors
         calculate_ray_distance(threadID, blockID, environments)
+        get_observations(threadID, blockID, observations, environments)
     end
 end
 
 function get_observations(threadID, blockID, observations, environments::CollectPoints)
 
-    if threadID ==1
-        maze_width = environments.maze_cell_size * environments.maze_rows
-        maze_heigth = environments.maze_cell_size * environments.maze_columns
+    maze_width = environments.maze_cell_size * environments.maze_rows
+    maze_heigth = environments.maze_cell_size * environments.maze_columns
+    normalization = max(maze_width, maze_heigth)
 
-        observations[1, blockID] = environments.agents_positions[1, blockID] / maze_width
-        observations[2, blockID] = environments.agents_positions[2, blockID] / maze_heigth
+    #Information about Agent-position and Points-position
+    if threadID == 1
+        observations[1, blockID] = environments.agents_positions[1, blockID] / normalization
+        observations[2, blockID] = environments.agents_positions[2, blockID] / normalization
 
-        observations[3, blockID] = environments.sensor_distances[1, blockID] / maze_heigth
-        observations[4, blockID] = environments.sensor_distances[2, blockID] / maze_heigth
-        observations[5, blockID] = environments.sensor_distances[3, blockID] / maze_width
-        observations[6, blockID] = environments.sensor_distances[4, blockID] / maze_width
+        observations[3, blockID] = environments.positive_points_positions[1, blockID] / normalization
+        observations[4, blockID] = environments.positive_points_positions[2, blockID] / normalization
 
-        observations[7, blockID] = environments.positive_points_positions[1, blockID] / maze_width
-        observations[8, blockID] = environments.positive_points_positions[2, blockID] / maze_heigth
+        observations[5, blockID] = environments.negative_points_positions[1, blockID] / normalization
+        observations[6, blockID] = environments.negative_points_positions[2, blockID] / normalization
+    end    
 
-        observations[9, blockID] = environments.negative_points_positions[1, blockID] / maze_width
-        observations[10, blockID] = environments.negative_points_positions[2, blockID] / maze_heigth
-    end
+    #Sensor distance Information
+    observations[threadID + 6, blockID] = environments.sensor_distances[threadID, blockID]
+
 end    
 
 function calculate_sensor_distance(blockID, cell_x:: Int, cell_y:: Int, environments::CollectPoints,)
@@ -331,8 +329,8 @@ function render(environments::CollectPoints, individual)
     
     for i = 1:environments.number_sensors
         angle_diff = deg2rad(angle_per_ray * i)
-        colission_point = Point(agent_position[1] + sensor_distances[i] * cos(angle_diff), agent_position[2] - sensor_distances[i] * sin(angle_diff))
         agent_point = Point(agent_position[1] + environments.agent_radius * cos(angle_diff), agent_position[2] -  environments.agent_radius * sin(angle_diff))
+        colission_point = Point(agent_position[1] + environments.agent_radius * cos(angle_diff) + sensor_distances[i] * cos(angle_diff), agent_position[2] -  environments.agent_radius * sin(angle_diff) - sensor_distances[i] * sin(angle_diff))
         if sensor_distances[i] > environments.agent_radius
             line(agent_point, colission_point, :stroke)
         end 
