@@ -88,7 +88,8 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
     angle_diff_per_ray = 360 / environments.number_sensors
     
     if threadID <= environments.number_sensors
-        init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)  
+        init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)
+        #calculate_ray_distance(threadID, blockID, environments)
     end
 
 end
@@ -201,7 +202,7 @@ function get_observations(threadID, blockID, observations, environments::Collect
     end    
 
     #Sensor distance Information
-    observations[threadID + 6, blockID] = environments.sensor_distances[threadID, blockID]
+    observations[threadID + 6, blockID] = environments.sensor_distances[threadID, blockID] / normalization
 
 end    
 
@@ -469,7 +470,7 @@ function init_ray(sensor_number, individual, init_x, init_y, angle_diff_per_ray,
     environments.ray_directions[1, sensor_number, individual] = environments.ray_directions[1, sensor_number, individual] / norm 
     environments.ray_directions[2, sensor_number, individual] = environments.ray_directions[2, sensor_number, individual] / norm  
     
-    #If direction is zero for a dimension, the dimension is ignored by setting a high distance
+    #If direction is zero for a dimension, the dimension is ignored by setting a high distance, else the delta_distance is assigned
     if -1e-10 < environments.ray_directions[1, sensor_number, individual] < 1e-10  
         environments.ray_directions[1, sensor_number, individual] = 0.0
         environments.ray_cell_distances[1, sensor_number, individual] = Inf32
