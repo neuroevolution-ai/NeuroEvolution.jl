@@ -250,18 +250,18 @@ function get_observations(threadID, blockID, observations, environments::Collect
 
     #Information about Agent-position and Points-position
     if threadID == 1
-        observations[1] = environments.agents_positions[1] / normalization
-        observations[2] = environments.agents_positions[2] / normalization
+        observations[1] = environments.agents_positions[1, blockID] / normalization
+        observations[2] = environments.agents_positions[2, blockID] / normalization
 
-        observations[3] = environments.positive_points_positions[1] / normalization
-        observations[4] = environments.positive_points_positions[2] / normalization
+        observations[3] = environments.positive_points_positions[1, blockID] / normalization
+        observations[4] = environments.positive_points_positions[2, blockID] / normalization
 
-        observations[5] = environments.negative_points_positions[1] / normalization
-        observations[6] = environments.negative_points_positions[2] / normalization
+        observations[5] = environments.negative_points_positions[1, blockID] / normalization
+        observations[6] = environments.negative_points_positions[2, blockID] / normalization
     end    
 
     #Sensor distance Information
-    observations[threadID + 6] = environments.sensor_distances[threadID] / normalization
+    observations[threadID + 6] = environments.sensor_distances[threadID, blockID] / normalization
 
 end    
 
