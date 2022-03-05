@@ -14,7 +14,8 @@
     "use_sensors": true,
     "reward_per_collected_positive_point": 500.0,
     "reward_per_collected_negative_point": -700.0,
-    "number_time_steps": 1000
+    "number_time_steps": 1000,
+    "number_sensors":6
   },
   "brain": {
     "type": "CTRNN",

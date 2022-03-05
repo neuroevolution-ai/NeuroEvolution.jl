@@ -6,7 +6,7 @@ using Dates
 using DataStructures
 
 include("environments/collect_points.jl")
-include("environments/dummy_app.jl")
+#include("environments/dummy_app.jl")
 include("brains/continuous_time_rnn.jl")
 include("brains/feed_forward_nn.jl")
 include("optimizers/cma_es.jl")
@@ -41,8 +41,8 @@ end
 
 function main()
 
-    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense_Dummy_App.json"
-
+    #configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense_Dummy_App.json"
+    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
@@ -51,7 +51,7 @@ function main()
 
     # Get environment type from configuration 
     # TODO: Choose environment type from configuration
-    environment_type = DummyApp
+    environment_type = CollectPoints
 
     # Get brain type from configuration
     if configuration["brain"]["type"] == "CTRNN"
@@ -76,11 +76,14 @@ function main()
     # Initialize environments
     environments = environment_type(config.environment, number_individuals)
 
-    number_inputs = get_number_observations(environments)
-    number_outputs = get_number_actions(environments)
+    #number_inputs = get_number_observations(environments)
+    #number_outputs = get_number_actions(environments)
+    
+    number_inputs = get_number_inputs(environments)
+    number_outputs = get_number_outputs(environments)
 
     # Initialize brains 
-    brains = brain_type(config.brain, number_inputs, number_outputs, number_individuals)
+    brains = brain_type(config.brain, number_outputs, number_inputs, number_individuals)
 
     individual_size = get_individual_size(brains)
 

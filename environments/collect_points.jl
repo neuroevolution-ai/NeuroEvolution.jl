@@ -6,6 +6,7 @@ using Distributions
 using LinearAlgebra
 
 include("../tools/linear_congruential_generator.jl")
+include("../brains/continuous_time_rnn.jl")
 
 struct CollectPoints{A,B,C,D}
 
@@ -67,8 +68,71 @@ end
 
 Adapt.@adapt_structure CollectPoints
 
+function kernel_eval_fitness(individuals, rewards, environment_seeds, number_rounds, brains, environments::CollectPoints)
 
-function initialize(threadID, blockID, environments::CollectPoints, offset, env_seed, rng_states)
+    threadID = threadIdx().x
+    blockID = blockIdx().x
+
+    offset_shared_memory = 0
+
+    rng_states = @cuDynamicSharedMem(Int64, 1, offset_shared_memory)
+    rng_states[1] = environment_seeds[blockID]
+    offset_shared_memory += sizeof(rng_states)
+
+    sync_threads()
+
+    observations = @cuDynamicSharedMem(Float32, environments.number_outputs, offset_shared_memory)
+    offset_shared_memory += sizeof(observations)
+
+    sync_threads()
+
+    action = @cuDynamicSharedMem(Float32, environments.number_inputs, offset_shared_memory)
+    offset_shared_memory += sizeof(action)
+
+    sync_threads()
+
+    # Initialize brains
+    initialize(brains, individuals)
+
+    sync_threads()
+
+
+    #Initialize maze
+    initialize(threadID, blockID, environments, offset_shared_memory, rng_states)
+
+    sync_threads()
+
+    offset_shared_memory += sizeof(Int32) * (environments.maze_columns * environments.maze_rows * 2) + sizeof(Int32) * 8
+
+    sync_threads()
+    
+    reset(brains)
+
+    sync_threads()
+
+    # Get Observation
+    if threadID <= environments.number_sensors
+        get_observations(threadID, blockID, observations, environments)
+    end
+
+    # Iterate over given number of time steps
+    for time_step = 1:environments.number_time_steps
+
+        sync_threads()
+
+        # Brain step
+        step(brains, observations, action, offset_shared_memory)
+        
+        sync_threads()
+
+        #Agent step
+        step(threadID, blockID, action, observations, rewards, offset_shared_memory, environments, rng_states)
+
+        sync_threads()
+    end
+end
+
+function initialize(threadID, blockID, environments::CollectPoints, offset, rng_states)
 
     if threadID == 1 
         #Build maze 
@@ -78,10 +142,6 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
         environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
         environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
         environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
-
-        #Calculate initial Sensor distances
-        cell_x = convert(Int, ceil(environments.agents_positions[1, blockID] / environments.maze_cell_size))
-        cell_y = convert(Int, ceil(environments.agents_positions[2, blockID] / environments.maze_cell_size))
     end
 
     #Initialize rays
@@ -89,8 +149,13 @@ function initialize(threadID, blockID, environments::CollectPoints, offset, env_
     
     if threadID <= environments.number_sensors
         init_ray(threadID, blockID, 1, 0, angle_diff_per_ray, environments)
-        #calculate_ray_distance(threadID, blockID, environments)
     end
+    sync_threads()
+
+    if threadID <= environments.number_sensors
+        calculate_ray_distance(threadID, blockID, environments)
+    end
+
 
 end
 
@@ -157,19 +222,13 @@ function step(threadID, blockID, action, observations, rewards, offset, environm
         if distance <= environments.point_radius + environments.agent_radius
             environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
             reward += environments.reward_per_collected_positive_point
-            if blockID == 1
-                @cuprintln("reward: $reward")
-            end   
         end
 
         # Collect negative point in reach
         distance = sqrt((environments.negative_points_positions[1, blockID] - environments.agents_positions[1, blockID])^2 + (environments.negative_points_positions[2, blockID] - environments.agents_positions[2, blockID])^2)
         if distance <= environments.point_radius + environments.agent_radius
             environments.negative_points_positions[1, blockID], environments.negative_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
-            reward += environments.reward_per_collected_negative_point
-            if blockID == 1
-                @cuprintln("reward: $reward")
-            end    
+            reward += environments.reward_per_collected_negative_point 
         end
         
         rewards[blockID] += reward
@@ -191,105 +250,20 @@ function get_observations(threadID, blockID, observations, environments::Collect
 
     #Information about Agent-position and Points-position
     if threadID == 1
-        observations[1, blockID] = environments.agents_positions[1, blockID] / normalization
-        observations[2, blockID] = environments.agents_positions[2, blockID] / normalization
+        observations[1] = environments.agents_positions[1] / normalization
+        observations[2] = environments.agents_positions[2] / normalization
 
-        observations[3, blockID] = environments.positive_points_positions[1, blockID] / normalization
-        observations[4, blockID] = environments.positive_points_positions[2, blockID] / normalization
+        observations[3] = environments.positive_points_positions[1] / normalization
+        observations[4] = environments.positive_points_positions[2] / normalization
 
-        observations[5, blockID] = environments.negative_points_positions[1, blockID] / normalization
-        observations[6, blockID] = environments.negative_points_positions[2, blockID] / normalization
+        observations[5] = environments.negative_points_positions[1] / normalization
+        observations[6] = environments.negative_points_positions[2] / normalization
     end    
 
     #Sensor distance Information
-    observations[threadID + 6, blockID] = environments.sensor_distances[threadID, blockID] / normalization
+    observations[threadID + 6] = environments.sensor_distances[threadID] / normalization
 
 end    
-
-function calculate_sensor_distance(blockID, cell_x:: Int, cell_y:: Int, environments::CollectPoints,)
-
-     # Get coordinates of current cell
-    cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(cell_x, cell_y, environments.maze_cell_size)
-
-    #Asuming we have 4 Sensors
-    #North distance
-    environments.sensor_distances[1, blockID] = environments.agents_positions[2, blockID] - cell_top - environments.agent_radius
-    environments.sensor_distances[1, blockID] += travers_maze(blockID, cell_x, cell_y, 1, environments) * environments.maze_cell_size
-
-    #South distance
-    environments.sensor_distances[2, blockID] = cell_bottom - environments.agents_positions[2, blockID] - environments.agent_radius
-    environments.sensor_distances[2, blockID] += travers_maze(blockID, cell_x, cell_y, 2, environments) * environments.maze_cell_size
-
-    #East distance
-    environments.sensor_distances[3, blockID] = cell_right - environments.agents_positions[1, blockID] - environments.agent_radius
-    environments.sensor_distances[3, blockID] += travers_maze(blockID, cell_x, cell_y, 3, environments) * environments.maze_cell_size
-
-    #West distance 
-    environments.sensor_distances[4, blockID] = environments.agents_positions[1, blockID] - cell_left - environments.agent_radius
-    environments.sensor_distances[4, blockID] += travers_maze(blockID, cell_x, cell_y, 4, environments) * environments.maze_cell_size
-end 
-
-#Iterates from agents position towards given direction and returns number of traversed cells until wall is met    
-function travers_maze(blockID, cell_x, cell_y, direction, environments::CollectPoints)
-    
-    number_traversed_cells = 0
-    x = cell_x
-    y = cell_y
-
-    while true
-
-        if direction == 1
-            if environments.maze_walls_north[x, y, blockID]
-                return number_traversed_cells
-            else 
-                number_traversed_cells += 1
-                y -= 1
-            end    
-        end
-
-        if direction == 2
-            if environments.maze_walls_south[x, y, blockID]
-                return number_traversed_cells
-            else 
-                number_traversed_cells += 1
-                y += 1
-            end    
-        end
-
-        if direction == 3
-            if environments.maze_walls_east[x, y, blockID]
-                return number_traversed_cells
-            else 
-                number_traversed_cells += 1
-                x += 1
-            end    
-        end
-
-        if direction == 4
-            if environments.maze_walls_west[x, y, blockID]
-                return number_traversed_cells
-            else 
-                number_traversed_cells += 1
-                x -= 1
-            end    
-        end
-    end
-    return number_traversed_cells   
-end    
-
-function get_memory_requirements(environments::CollectPoints)
-    total_amount_of_cells = environments.maze_columns * environments.maze_rows
-
-    return sizeof(Int32) * (2 * total_amount_of_cells) + sizeof(Int32) * 8
-end
-
-function get_number_inputs(environments::CollectPoints)
-    return environments.number_inputs
-end
-
-function get_number_outputs(environments::CollectPoints)
-    return environments.number_outputs
-end
 
 function is_valid_cell(x_index, y_index, environments::CollectPoints)
 
@@ -404,11 +378,9 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset, rng
     index_cell_stack = 0
     cell_stack = @cuDynamicSharedMem(Int32, (total_amount_of_cells, 2), offset)
     offset += sizeof(cell_stack)
-    sync_threads()
 
     neighbours = @cuDynamicSharedMem(Int32, (4, 2), offset)
     offset += sizeof(neighbours)
-    sync_threads()
 
     # Total number of visited cells during maze construction.
     nv = 1
@@ -429,7 +401,7 @@ function create_maze(threadID, blockID, environments::CollectPoints, offset, rng
         end
 
         # Choose a random neighbouring cell and move to it.
-        k = lgc_random(rng_states, blockID, 1, number_neighbours)
+        k = lgc_random(rng_states, 1, 1, number_neighbours)
         next_cell_x = neighbours[k, 1]
         next_cell_y = neighbours[k, 2]
 
@@ -663,11 +635,32 @@ end
 
 function place_randomly_in_maze(blockID, environments::CollectPoints, rng_states)
 
-    x_position = lgc_random(rng_states, blockID, environments.maze_rows - 1) * environments.maze_cell_size
-    x_position += lgc_random(rng_states, blockID, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
+    x_position = lgc_random(rng_states, 1, environments.maze_rows - 1) * environments.maze_cell_size
+    x_position += lgc_random(rng_states, 1, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
 
-    y_position = lgc_random(rng_states, blockID, environments.maze_columns - 1) * environments.maze_cell_size
-    y_position += lgc_random(rng_states, blockID, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
+    y_position = lgc_random(rng_states, 1, environments.maze_columns - 1) * environments.maze_cell_size
+    y_position += lgc_random(rng_states, 1, environments.agent_radius, (environments.maze_cell_size - environments.agent_radius))
 
     return x_position, y_position
+end
+
+function get_memory_requirements(environments::CollectPoints)
+    total_amount_of_cells = environments.maze_columns * environments.maze_rows
+
+    return sizeof(Int32) * (2 * total_amount_of_cells) + sizeof(Int32) * 8 +    #Maze initialization
+            sizeof(Float32) * environments.number_inputs +                      #Actions
+            sizeof(Float32) * environments.number_outputs +                     #observations
+            sizeof(Int64)                                                       #RNG states
+end
+
+function get_number_inputs(environments::CollectPoints)
+    return environments.number_inputs
+end
+
+function get_number_outputs(environments::CollectPoints)
+    return environments.number_outputs
+end
+
+function get_required_threads(environments::CollectPoints)
+    return environments.number_sensors
 end

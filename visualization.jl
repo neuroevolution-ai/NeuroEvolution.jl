@@ -9,13 +9,13 @@ function kernel_test_initialize(environments, env_seed, number_individuals)
     tx = threadIdx().x
     bx = blockIdx().x
 
-    rng_states = @cuDynamicSharedMem(Int64, number_individuals)
-    fill!(rng_states, env_seed)
+    rng_states = @cuDynamicSharedMem(Int64, 1)
+    rng_states[1] = env_seed
     
     offset = sizeof(rng_states)
     sync_threads()
 
-    initialize(tx, bx, environments, offset, env_seed, rng_states)
+    initialize(tx, bx, environments, offset, rng_states)
 
     return
 end
@@ -31,7 +31,7 @@ function kernel_test_step(actions, observations, rewards, environments, env_seed
     offset = sizeof(input)
     sync_threads()
     
-    rng_states = @cuDynamicSharedMem(Int64, number_individuals)
+    rng_states = @cuDynamicSharedMem(Int64, 1, offset)
     offset += sizeof(rng_states)
     sync_threads()
 
