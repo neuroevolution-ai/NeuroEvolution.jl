@@ -468,7 +468,6 @@ function calculate_ray_distance(sensor_number, individual, environments::Collect
     current_cell_y = convert(Int, ceil(environments.agents_positions[2, individual] / environments.maze_cell_size))
 
     cell_left, cell_right, cell_top, cell_bottom = get_coordinates_maze_cell(current_cell_x, current_cell_y, environments.maze_cell_size)
-    test = environments.ray_cell_distances[2, sensor_number, individual]
 
     if environments.ray_directions[1, sensor_number, individual] < 0.0
         step_direction_x = -1
@@ -490,7 +489,6 @@ function calculate_ray_distance(sensor_number, individual, environments::Collect
     else
         step_direction_y = -1
         ray_length_y = (environments.agents_positions[2, individual] - cell_top) / environments.maze_cell_size
-        test = environments.ray_cell_distances[2, sensor_number, individual]
         ray_length_y *= environments.ray_cell_distances[2, sensor_number, individual]
         maze_walls_y = environments.maze_walls_north
     end
