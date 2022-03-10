@@ -134,10 +134,10 @@ end
 
 function initialize(threadID, blockID, environments::CollectPoints, offset, rng_states)
 
-    if threadID == 1 
-        #Build maze 
-        create_maze(threadID, blockID, environments, offset, rng_states)
+    #Build maze 
+    create_maze(threadID, blockID, environments, offset, rng_states)
 
+    if threadID == 1 
         #Randomly place agent and points in maze
         environments.agents_positions[1, blockID], environments.agents_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
         environments.positive_points_positions[1, blockID], environments.positive_points_positions[2, blockID] = place_randomly_in_maze(blockID, environments, rng_states)
@@ -363,69 +363,71 @@ end
 function create_maze(threadID, blockID, environments::CollectPoints, offset, rng_states)
 
     # Reset all walls (set all entries to true)
-    for x = 1:environments.maze_columns
+    if threadID <= environments.maze_columns
         for y = 1:environments.maze_rows
-            environments.maze_walls_south[x, y, blockID] = true
-            environments.maze_walls_north[x, y, blockID] = true
-            environments.maze_walls_east[x, y, blockID] = true
-            environments.maze_walls_west[x, y, blockID] = true
+            environments.maze_walls_south[threadID, y, blockID] = true
+            environments.maze_walls_north[threadID, y, blockID] = true
+            environments.maze_walls_east[threadID, y, blockID] = true
+            environments.maze_walls_west[threadID, y, blockID] = true
         end
     end
 
-    # Total number of cells.
-    total_amount_of_cells = environments.maze_columns * environments.maze_rows
+    if threadID == 1
+        # Total number of cells.
+        total_amount_of_cells = environments.maze_columns * environments.maze_rows
 
-    index_cell_stack = 0
-    cell_stack = @cuDynamicSharedMem(Int32, (total_amount_of_cells, 2), offset)
-    offset += sizeof(cell_stack)
+        index_cell_stack = 0
+        cell_stack = @cuDynamicSharedMem(Int32, (total_amount_of_cells, 2), offset)
+        offset += sizeof(cell_stack)
 
-    neighbours = @cuDynamicSharedMem(Int32, (4, 2), offset)
-    offset += sizeof(neighbours)
+        neighbours = @cuDynamicSharedMem(Int32, (4, 2), offset)
+        offset += sizeof(neighbours)
 
-    # Total number of visited cells during maze construction.
-    nv = 1
+        # Total number of visited cells during maze construction.
+        nv = 1
 
-    current_cell_x = 1
-    current_cell_y = 1
+        current_cell_x = 1
+        current_cell_y = 1
 
-    while nv < total_amount_of_cells
+        while nv < total_amount_of_cells
 
-        number_neighbours = find_valid_neighbors(blockID, current_cell_x, current_cell_y, neighbours, environments)
+            number_neighbours = find_valid_neighbors(blockID, current_cell_x, current_cell_y, neighbours, environments)
 
-        if number_neighbours == 0
-          # We've reached a dead end: backtrack, pop cell from cell stack
-            current_cell_x = cell_stack[index_cell_stack, 1]
-            current_cell_y = cell_stack[index_cell_stack, 2]
-            index_cell_stack -= 1
-            continue
+            if number_neighbours == 0
+            # We've reached a dead end: backtrack, pop cell from cell stack
+                current_cell_x = cell_stack[index_cell_stack, 1]
+                current_cell_y = cell_stack[index_cell_stack, 2]
+                index_cell_stack -= 1
+                continue
+            end
+
+            # Choose a random neighbouring cell and move to it.
+            k = lgc_random(rng_states, 1, 1, number_neighbours)
+            next_cell_x = neighbours[k, 1]
+            next_cell_y = neighbours[k, 2]
+
+            # Store chosen random value to enable unit test for the create_maze function
+            environments.maze_randoms[nv, blockID] = k
+
+            # Knock down the wall between current_cell and next_cell
+
+            knock_down_wall(blockID, current_cell_x, current_cell_y, next_cell_x, next_cell_y, environments)
+
+            # Push current cell to cell stack
+            index_cell_stack += 1
+            cell_stack[index_cell_stack, 1] = current_cell_x
+            cell_stack[index_cell_stack, 2] = current_cell_y
+
+            current_cell_x = next_cell_x
+            current_cell_y = next_cell_y
+
+            nv += 1
         end
-
-        # Choose a random neighbouring cell and move to it.
-        k = lgc_random(rng_states, 1, 1, number_neighbours)
-        next_cell_x = neighbours[k, 1]
-        next_cell_y = neighbours[k, 2]
-
-        # Store chosen random value to enable unit test for the create_maze function
-        environments.maze_randoms[nv, blockID] = k
-
-        # Knock down the wall between current_cell and next_cell
-
-        knock_down_wall(blockID, current_cell_x, current_cell_y, next_cell_x, next_cell_y, environments)
-
-        # Push current cell to cell stack
-        index_cell_stack += 1
-        cell_stack[index_cell_stack, 1] = current_cell_x
-        cell_stack[index_cell_stack, 2] = current_cell_y
-
-        current_cell_x = next_cell_x
-        current_cell_y = next_cell_y
-
-        nv += 1
     end
-    
 end
 
-#Calculates the distance, the ray has to travel to reach the next cell for each dimension seperatly
+# Calculates the distance, the ray has to travel to reach the next cell for each dimension seperatly
+# Executed once at Maze initialization
 function init_ray(sensor_number, individual, init_x, init_y, angle_diff_per_ray, environments::CollectPoints)
 
     #calulating the ray dircetion by rotating an initial ray direction in respect to the sensor number
