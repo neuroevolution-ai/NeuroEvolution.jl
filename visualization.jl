@@ -4,13 +4,19 @@ include("environments/collect_points.jl")
 include("tools/play.jl")
 include("tools/linear_congruential_generator.jl")
 
-function kernel_test_initialize(environments, env_seed, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
+function kernel_test_initialize(
+    environments,
+    env_seed,
+    test_sensor_distances,
+    test_ray_directions,
+    test_ray_cell_distances,
+)
 
     tx = threadIdx().x
     bx = blockIdx().x
 
     rng_states = @cuDynamicSharedMem(Int64, 1)
-    rng_states[1] = env_seed    
+    rng_states[1] = env_seed
     offset = sizeof(rng_states)
     sync_threads()
 
@@ -24,12 +30,22 @@ function kernel_test_initialize(environments, env_seed, test_sensor_distances, t
 
     sync_threads()
 
-    ray_cell_distances = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    ray_cell_distances =
+        @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
     offset += sizeof(ray_cell_distances)
 
     sync_threads()
 
-    initialize(tx, bx, sensor_distances, ray_directions, ray_cell_distances, environments, offset, rng_states)
+    initialize(
+        tx,
+        bx,
+        sensor_distances,
+        ray_directions,
+        ray_cell_distances,
+        environments,
+        offset,
+        rng_states,
+    )
 
     #Copy data from shared memory to global memory
     if tx <= environments.number_sensors
@@ -40,12 +56,20 @@ function kernel_test_initialize(environments, env_seed, test_sensor_distances, t
 
         test_ray_cell_distances[1, tx, bx] = ray_cell_distances[1, tx]
         test_ray_cell_distances[2, tx, bx] = ray_cell_distances[2, tx]
-    end 
+    end
 
     return
 end
 
-function kernel_test_step(actions, observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
+function kernel_test_step(
+    actions,
+    observations,
+    test_sensor_distances,
+    test_ray_directions,
+    test_ray_cell_distances,
+    rewards,
+    environments,
+)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -56,7 +80,7 @@ function kernel_test_step(actions, observations, test_sensor_distances, test_ray
     offset = sizeof(input)
 
     sync_threads()
-    
+
     rng_states = @cuDynamicSharedMem(Int64, 1, offset)
     offset += sizeof(rng_states)
     sync_threads()
@@ -75,23 +99,50 @@ function kernel_test_step(actions, observations, test_sensor_distances, test_ray
 
     sync_threads()
 
-    ray_cell_distances = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    ray_cell_distances =
+        @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
     offset += sizeof(ray_cell_distances)
 
     sync_threads()
 
     angle_diff_per_ray = 360 / environments.number_sensors
-    
+
     if tx <= environments.number_sensors
-        init_ray(tx, 1, 0, angle_diff_per_ray, ray_directions, ray_cell_distances, environments)
+        init_ray(
+            tx,
+            1,
+            0,
+            angle_diff_per_ray,
+            ray_directions,
+            ray_cell_distances,
+            environments,
+        )
     end
     sync_threads()
 
     if tx <= environments.number_sensors
-        calculate_ray_distance(tx, bx, sensor_distances, ray_directions, ray_cell_distances, environments)
+        calculate_ray_distance(
+            tx,
+            bx,
+            sensor_distances,
+            ray_directions,
+            ray_cell_distances,
+            environments,
+        )
     end
 
-    step(tx, bx, input, observation, sensor_distances, ray_directions, ray_cell_distances, rewards, environments, rng_states)
+    step(
+        tx,
+        bx,
+        input,
+        observation,
+        sensor_distances,
+        ray_directions,
+        ray_cell_distances,
+        rewards,
+        environments,
+        rng_states,
+    )
     sync_threads()
 
     #Copy data from shared memory to global memory
@@ -107,13 +158,13 @@ function kernel_test_step(actions, observations, test_sensor_distances, test_ray
 
         test_ray_cell_distances[1, tx, bx] = ray_cell_distances[1, tx]
         test_ray_cell_distances[2, tx, bx] = ray_cell_distances[2, tx]
-    end     
+    end
 
     if tx == 1
-        for i = (environments.number_sensors + 1):environments.number_outputs
+        for i = (environments.number_sensors+1):environments.number_outputs
             observations[i, bx] = observation[i]
-        end    
-    end    
+        end
+    end
 
     return
 end
@@ -134,18 +185,34 @@ function main()
     config_environment["number_sensors"] = 10
 
     env_seed = rand(1:1000)
-    
+
     number_individuals = 10
 
     environments = CollectPoints(config_environment, number_individuals)
 
-    test_sensor_distances = CUDA.fill(0.0f0, (convert(Int64, environments.number_sensors), number_individuals))
-    test_ray_directions = CUDA.fill(0.0f0, (2, convert(Int64, environments.number_sensors), number_individuals))
-    test_ray_cell_distances = CUDA.fill(0.0f0, (2, convert(Int64, environments.number_sensors), number_individuals))
+    test_sensor_distances =
+        CUDA.fill(0.0f0, (convert(Int64, environments.number_sensors), number_individuals))
+    test_ray_directions = CUDA.fill(
+        0.0f0,
+        (2, convert(Int64, environments.number_sensors), number_individuals),
+    )
+    test_ray_cell_distances = CUDA.fill(
+        0.0f0,
+        (2, convert(Int64, environments.number_sensors), number_individuals),
+    )
 
-    shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs + sizeof(Int64) * number_individuals
+    shared_memory =
+        get_memory_requirements(environments) +
+        sizeof(Float32) * environments.number_inputs +
+        sizeof(Int64) * number_individuals
 
-    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
+    CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_initialize(
+        environments,
+        env_seed,
+        test_sensor_distances,
+        test_ray_directions,
+        test_ray_cell_distances,
+    )
 
     CUDA.synchronize()
 
@@ -156,11 +223,19 @@ function main()
     observations = CUDA.fill(0.0f0, (environments.number_outputs, number_individuals))
 
     rewards = CUDA.fill(0, number_individuals)
-    
+
 
     @play width height number_iterations begin
-        actions = CuArray(rand(Uniform(-1, 1),(2, number_individuals)))
-        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(actions, observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
+        actions = CuArray(rand(Uniform(-1, 1), (2, number_individuals)))
+        CUDA.@cuda threads = 10 blocks = number_individuals shmem = shared_memory kernel_test_step(
+            actions,
+            observations,
+            test_sensor_distances,
+            test_ray_directions,
+            test_ray_cell_distances,
+            rewards,
+            environments,
+        )
         CUDA.synchronize()
 
         render(test_sensor_distances, environments, 1)
