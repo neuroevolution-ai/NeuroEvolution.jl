@@ -6,7 +6,7 @@ include("../environments/collect_points.jl")
 include("environments/create_maze.jl")
 
 
-function kernel_test_initialize(environments, env_seed, number_individuals)
+function kernel_test_initialize(environments, env_seed, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -16,12 +16,39 @@ function kernel_test_initialize(environments, env_seed, number_individuals)
     offset = sizeof(rng_states)
     sync_threads()
 
-    initialize(tx, bx, environments, offset, rng_states)
+    sensor_distances = @cuDynamicSharedMem(Float32, environments.number_sensors, offset)
+    offset += sizeof(sensor_distances)
+
+    sync_threads()
+
+    ray_directions = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    offset += sizeof(ray_directions)
+
+    sync_threads()
+
+    ray_cell_distances = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    offset += sizeof(ray_cell_distances)
+
+    sync_threads()
+
+    initialize(tx, bx, sensor_distances, ray_directions, ray_cell_distances, environments, offset, rng_states)
+    sync_threads()
+
+    #Copy data from shared memory to global memory
+    if tx <= environments.number_sensors
+        test_sensor_distances[tx, bx] = sensor_distances[tx]
+
+        test_ray_directions[1, tx, bx] = ray_directions[1, tx]
+        test_ray_directions[2, tx, bx] = ray_directions[2, tx]
+
+        test_ray_cell_distances[1, tx, bx] = ray_cell_distances[1, tx]
+        test_ray_cell_distances[2, tx, bx] = ray_cell_distances[2, tx]
+    end 
 
     return
 end
 
-function kernel_test_step(actions, observations, rewards, environments, env_seed, number_individuals)
+function kernel_test_step(actions, observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
 
     tx = threadIdx().x
     bx = blockIdx().x
@@ -30,6 +57,7 @@ function kernel_test_step(actions, observations, rewards, environments, env_seed
     input[1] = actions[1, bx]
     input[2] = actions[2, bx]
     offset = sizeof(input)
+
     sync_threads()
     
     rng_states = @cuDynamicSharedMem(Int64, 1, offset)
@@ -40,13 +68,51 @@ function kernel_test_step(actions, observations, rewards, environments, env_seed
     offset += sizeof(observation)
     sync_threads()
 
-    step(tx, bx, input, observation, rewards, offset, environments, rng_states)
+    sensor_distances = @cuDynamicSharedMem(Float32, environments.number_sensors, offset)
+    offset += sizeof(sensor_distances)
+
     sync_threads()
 
+    ray_directions = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    offset += sizeof(ray_directions)
+
+    sync_threads()
+
+    ray_cell_distances = @cuDynamicSharedMem(Float32, (2, environments.number_sensors), offset)
+    offset += sizeof(ray_cell_distances)
+
+    sync_threads()
+
+    angle_diff_per_ray = 360 / environments.number_sensors
+
+    if tx <= environments.number_sensors
+        init_ray(tx, 1, 0, angle_diff_per_ray, ray_directions, ray_cell_distances, environments)
+    end
+    sync_threads()
+
+    if tx <= environments.number_sensors
+        calculate_ray_distance(tx, bx, sensor_distances, ray_directions, ray_cell_distances, environments)
+    end
+    sync_threads()
+
+    step(tx, bx, input, observation, sensor_distances, ray_directions, ray_cell_distances, rewards, environments, rng_states)
+    sync_threads()
+
+    #Copy data from shared memory to global memory
     if tx <= environments.number_outputs
         observations[tx, bx] = observation[tx]
     end
+    
+    if tx <= environments.number_sensors
+        test_sensor_distances[tx, bx] = sensor_distances[tx]
+        
+        test_ray_directions[1, tx, bx] = ray_directions[1, tx]
+        test_ray_directions[2, tx, bx] = ray_directions[2, tx]
 
+        test_ray_cell_distances[1, tx, bx] = ray_cell_distances[1, tx]
+        test_ray_cell_distances[2, tx, bx] = ray_cell_distances[2, tx]
+    end     
+    sync_threads()
     if tx == 1
         for i = (environments.number_sensors + 1):environments.number_outputs
             observations[i, bx] = observation[i]
@@ -56,10 +122,10 @@ function kernel_test_step(actions, observations, rewards, environments, env_seed
     return
 end
 
-function DDA_cpu(environments::CollectPoints, sensor_distances, number_individuals)
+function DDA_cpu(environments::CollectPoints, sensor_distances,  ray_directions, ray_cell_distances, number_individuals)
     cpu_agent_position = Array(environments.agents_positions)
-    cpu_ray_directions = Array(environments.ray_directions)
-    cpu_ray_cell_distances = Array(environments.ray_cell_distances)
+    cpu_ray_directions = Array(ray_directions)
+    cpu_ray_cell_distances = Array(ray_cell_distances)
 
     for individual = 1:number_individuals
         for sensor_number = 1:environments.number_sensors
@@ -143,6 +209,14 @@ end
 
     environments = CollectPoints(config_environment, number_individuals)
 
+    # In test code programm will jump out of gpu after every step
+    #-> the in shared memory stored data has to be stored after every execution
+    rewards = CUDA.fill(0, number_individuals)
+    observations = CUDA.fill(0.0f0, (environments.number_outputs, number_individuals))
+    test_sensor_distances = CUDA.fill(0.0f0, (convert(Int64, environments.number_sensors), number_individuals))
+    test_ray_directions = CUDA.fill(0.0f0, (2, convert(Int64, environments.number_sensors), number_individuals))
+    test_ray_cell_distances = CUDA.fill(0.0f0, (2, convert(Int64, environments.number_sensors), number_individuals))
+
     shared_memory = get_memory_requirements(environments) + sizeof(Float32) * environments.number_inputs + sizeof(Int64) * number_individuals
 
     thread_number = get_required_threads(environments)
@@ -151,7 +225,7 @@ end
     # Maze initialization tests
     #---------------------------------------------------------------------------------------------------------------
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
 
     CUDA.synchronize()
 
@@ -163,6 +237,8 @@ end
     agent_positions_cpu = Array(environments.agents_positions)
     positive_points_position_cpu = Array(environments.positive_points_positions)
     negativ_points_position_cpu = Array(environments.negative_points_positions)
+
+    
 
     #Comparing GPU- to CPU maze initialization
     for i = 1:number_individuals
@@ -195,7 +271,7 @@ end
     end
 
     #Further maze initialization for seed testing
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
 
     CUDA.synchronize()
 
@@ -211,7 +287,7 @@ end
         env_seed_second = rand(1:1000)
     end
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed_second, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed_second, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
 
     CUDA.synchronize()
 
@@ -225,8 +301,6 @@ end
     # Step function tests
     #---------------------------------------------------------------------------------------------------------------
 
-    rewards = CUDA.fill(0, number_individuals)
-    observations = CUDA.fill(0.0f0, (environments.number_outputs, number_individuals))
 
 
     mr = environments.agent_movement_range
@@ -245,7 +319,7 @@ end
         new_agents_position[2, i] += convert(Int, round(clamp(actions[2, i] * mr, -mr, mr)))
     end  
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
 
     CUDA.synchronize()
 
@@ -262,7 +336,7 @@ end
 
     fill!(actions, 1)
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
 
     CUDA.synchronize()
 
@@ -278,7 +352,7 @@ end
 
     fill!(actions, -1)
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
 
     CUDA.synchronize()
     
@@ -290,14 +364,13 @@ end
     # Sensor tests
     #---------------------------------------------------------------------------------------------------------------
 
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed_second, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_initialize(environments, env_seed_second, test_sensor_distances, test_ray_directions, test_ray_cell_distances)
 
     CUDA.synchronize()
 
     #Test ray initialization
-    cpu_ray_directions = Array(environments.ray_directions)
-    cpu_ray_distances = Array(environments.ray_cell_distances)
-    
+    cpu_ray_directions = Array(test_ray_directions)
+    cpu_ray_distances = Array(test_ray_cell_distances)
 
     for individual = 1:number_individuals
         for sensor_number = 1:environments.number_sensors
@@ -328,10 +401,10 @@ end
     #----------------------------
 
     actions .= [1, 0]
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
     CUDA.synchronize()
 
-    new_sensor_distances = Array(environments.sensor_distances)
+    new_sensor_distances = Array(test_sensor_distances)
     new_agents_position = Array(environments.agents_positions)
     new_pos_position = Array(environments.positive_points_positions) 
     new_neg_position = Array(environments.negative_points_positions)
@@ -340,7 +413,7 @@ end
     cpu_new_sensor_distances = fill(0.0f0, (environments.number_sensors, number_individuals))
 
     #Perform DDA on the cpu to calculate new sensor distances
-    DDA_cpu(environments, cpu_new_sensor_distances, number_individuals)
+    DDA_cpu(environments, cpu_new_sensor_distances, test_ray_directions, test_ray_cell_distances, number_individuals)
 
     for individual = 1:number_individuals
         for sensor_number = 1:environments.number_sensors
@@ -371,17 +444,17 @@ end
     #----------------------------
 
     actions .= [0, 1]
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
     CUDA.synchronize()
     
-    new_sensor_distances = Array(environments.sensor_distances)
+    new_sensor_distances = Array(test_sensor_distances)
     new_agents_position = Array(environments.agents_positions)
     new_pos_position = Array(environments.positive_points_positions) 
     new_neg_position = Array(environments.negative_points_positions)
     cpu_observations = Array(observations)
 
     #distances
-    DDA_cpu(environments, cpu_new_sensor_distances, number_individuals)
+    DDA_cpu(environments, cpu_new_sensor_distances, cpu_ray_directions, cpu_ray_distances, number_individuals)
     for individual = 1:number_individuals
         for sensor_number = 1:environments.number_sensors
             @test new_sensor_distances[sensor_number, individual] == cpu_new_sensor_distances[sensor_number, individual]
@@ -410,17 +483,17 @@ end
     #----------------------------
 
     actions = rand(Uniform(-1, 1),(2, number_individuals))
-    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, rewards, environments, env_seed, number_individuals)
+    CUDA.@cuda threads = thread_number blocks = number_individuals shmem = shared_memory kernel_test_step(CuArray(actions), observations, test_sensor_distances, test_ray_directions, test_ray_cell_distances, rewards, environments)
     CUDA.synchronize()
     
-    new_sensor_distances = Array(environments.sensor_distances)
+    new_sensor_distances = Array(test_sensor_distances)
     new_agents_position = Array(environments.agents_positions)
     new_pos_position = Array(environments.positive_points_positions) 
     new_neg_position = Array(environments.negative_points_positions)
     cpu_observations = Array(observations)
 
     #distances
-    DDA_cpu(environments, cpu_new_sensor_distances, number_individuals)
+    DDA_cpu(environments, cpu_new_sensor_distances, test_ray_directions, test_ray_cell_distances, number_individuals)
     for individual = 1:number_individuals
         for sensor_number = 1:environments.number_sensors
             @test new_sensor_distances[sensor_number, individual] == cpu_new_sensor_distances[sensor_number, individual]
