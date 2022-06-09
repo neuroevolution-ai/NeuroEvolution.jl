@@ -1,6 +1,6 @@
 using Adapt
 
-struct LongShortTermMemoryNN{A, B, C}
+struct LongShortTermMemoryNN{A, B, C, D, E}
     number_neurons::Int64
     W_i::A
     W_f::A
@@ -15,8 +15,10 @@ struct LongShortTermMemoryNN{A, B, C}
     b_o::C
     b_c::C
     hidden::C
-    input_size::Int64
-    output_size::Int64
+    V::D
+    b_v::E
+    number_inputs::Int64
+    number_outputs::Int64
 end
 
 function LongShortTermMemoryNN(number_neurons::Int, number_inputs::Int, number_outputs::Int, number_individuals::Int)
@@ -36,6 +38,8 @@ function LongShortTermMemoryNN(number_neurons::Int, number_inputs::Int, number_o
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, number_neurons, number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
         number_inputs,
         number_outputs
     )
@@ -45,12 +49,15 @@ Adapt.@adapt_structure LongShortTermMemoryNN
 
 function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individuals)
 
-    w_size = brains.input_size * brains.number_neurons
+    w_size = brains.number_inputs * brains.number_neurons
     u_size = brains.number_neurons * brains.number_neurons
+    b_size = brains.number_neurons
+    v_size = brains.number_neurons * brains.number_outputs
+
     offset = 0
 
-    if threadID <= brains.number_neurons
-        for i = 1:brains.input_size
+    if threadID <= brains.number_neurons 
+        for i = 1:brains.number_inputs
             brains.W_i[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + offset]
             brains.W_f[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + 1 * w_size + offset]
             brains.W_o[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + 2 * w_size + offset]
@@ -72,6 +79,17 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
         brains.b_f[threadID, blockID] = individuals[blockID, threadID + 1 * brains.number_neurons + offset]
         brains.b_o[threadID, blockID] = individuals[blockID, threadID + 2 * brains.number_neurons + offset]
         brains.b_c[threadID, blockID] = individuals[blockID, threadID + 3 * brains.number_neurons + offset]
+
+        offset += 4* b_size
+    end
+    
+    if threadID <= brains.number_outputs
+        for i = 1:brains.number_neurons
+            brains.V[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_outputs + offset]
+        end
+
+        offset += v_size
+        brains.b_v[threadID,blockID] = individuals[blockID, threadID + offset]
     end    
 
     sync_threads()
@@ -97,9 +115,11 @@ function reset(threadID, blockID, brains::LongShortTermMemoryNN)
 end
 
 function get_individual_size(brains::LongShortTermMemoryNN)
-    return 4 * brains.input_size * brains.number_neurons +
-        4 * brains.number_neurons * brains.number_neurons + 
-        4 * brains.number_neurons
+    return 4 * brains.number_inputs * brains.number_neurons +       #Input weights
+        4 * brains.number_neurons * brains.number_neurons +         #Hidden weights
+        4 * brains.number_neurons +                                 #Biases
+        brains.number_outputs * brains.number_neurons +             #Output layer weights
+        brains.number_outputs
 end
 
 function get_required_threads(brains::LongShortTermMemoryNN)
