@@ -20,10 +20,48 @@ function kernel_test_brain_initialize(individuals, brains)
 
 end
 
-function cpu_brain_step()
+function kernel_test_brain_step(inputs, outputs, brains::LongShortTermMemoryNN, gate_results_all)
+    threadID = threadIdx().x
+    blockID = blockIdx().x
+
+    offset_memory = 0
+
+    input = @cuDynamicSharedMem(Float32, brains.number_inputs, offset_memory)
+    offset_memory += sizeof(input)
+
+    output = @cuDynamicSharedMem(Float32, brains.number_outputs, offset_memory)
+    offset_memory += sizeof(output)
+
+    gate_results = @cuDynamicSharedMem(Float32, (4, brains.number_neurons), offset_memory)
+    offset_memory += sizeof(gate_results)
+
+    sync_threads()
+
+    if threadID <= brains.number_inputs
+        input[threadID] = inputs[threadID, blockID]
+    end
+
+    sync_threads()
+
+    step(threadID, blockID, brains, gate_results, input, output)
+
+    sync_threads()
+
+    if threadID <= brains.number_outputs
+        outputs[threadID, blockID] = output[threadID]
+    end
+    sync_threads()
+
+    if threadID <= brains.number_neurons
+        for i = 1:4
+            gate_results_all[i, threadID, blockID] = gate_results[i, threadID]
+        end
+    end
+
+    return
 end    
 
-@testset "Feed-Forward Neural Network" begin
+@testset "Long Short Term Neural Network" begin
 
     number_neurons = 10 
     number_inputs = 30
@@ -153,13 +191,22 @@ end
 
     hidden_states = zeros(Float32, (number_neurons, number_individuals))
     cell_states = zeros(Float32, (number_neurons, number_individuals))
+    
     output = zeros(number_outputs, number_individuals)
+    output_gpu = CuArray(output)
     output_flux = zeros(number_outputs, number_individuals)
 
+    gate_results = CUDA.fill(0.0f0, (4, number_neurons, number_individuals))
 
     input = randn(Float32, number_inputs, number_individuals)
+    input_gpu = CuArray(input)
+
+    shared_memory_size = sizeof(Float32) * brains.number_inputs +
+        sizeof(Float32) * brains.number_outputs +
+        sizeof(Float32) * brains.number_neurons * 4
     
-        
+    #GPU Brain step
+    @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
 
     for j = 1:number_individuals
         #Flux LSTM layer weight initialization
@@ -207,23 +254,22 @@ end
         #Output Layer 
         output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
 
-        #Testing outputs of lstm layer against flux
+        #Building Flux LSTM 
         flux_lstm_layer = Flux.Recur(flux_lstm_cell)
-        #@test flux_lstm_layer(input[:, j]) ≈ hidden_states[:, j] rtol = 0.00001
 
-        #Reset flux cell states
-        #flux_lstm_cell.state0[1] .= hidden_states[:, j]
-        #flux_lstm_cell.state0[2] .= cell_states[:, j]
+        #Testing cpu outputs of lstm layer against flux
+        #@test flux_lstm_layer(input[:, j]) ≈ hidden_states[:, j] rtol = 0.00001
         
         flux_output_layer = Dense(V[:, :, j], b_v[:, j], tanh)
         flux_lstm = Chain(flux_lstm_layer, flux_output_layer)
 
         output_flux[:, j] = flux_lstm(input[:, j])
 
-        #Testing output of output layer against flux
+        #Testing cpu output of output layer against flux
         @test output_flux[:, j] ≈ output[:, j] rtol = 0.00001
 
+        #Testing GPU output against Flux
+        @test Array(output_gpu[:, j]) ≈ output_flux[:, j] rtol = 0.00001
     end
-
 
 end    
