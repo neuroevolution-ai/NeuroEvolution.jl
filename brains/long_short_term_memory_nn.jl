@@ -1,4 +1,5 @@
 using Adapt
+using LinearAlgebra
 
 struct LongShortTermMemoryNN{A, B, C, D, E}
     number_neurons::Int64
@@ -14,7 +15,8 @@ struct LongShortTermMemoryNN{A, B, C, D, E}
     b_f::C
     b_o::C
     b_c::C
-    hidden::C
+    hidden_state::C
+    cell_state::C
     V::D
     b_v::E
     number_inputs::Int64
@@ -33,6 +35,7 @@ function LongShortTermMemoryNN(number_neurons::Int, number_inputs::Int, number_o
         CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
+        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
         CUDA.fill(0.0f0, (number_neurons, number_individuals)),
@@ -82,7 +85,7 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 
         offset += 4* b_size
     end
-    
+
     if threadID <= brains.number_outputs
         for i = 1:brains.number_neurons
             brains.V[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_outputs + offset]
@@ -90,7 +93,8 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 
         offset += v_size
         brains.b_v[threadID,blockID] = individuals[blockID, threadID + offset]
-    end    
+    end 
+    
 
     sync_threads()
 
@@ -100,15 +104,70 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 
 end
 
-function step(threadID, blockId, brains::LongShortTermMemoryNN)
-    #Forget-Gate 
+function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, input, output)
+    #TODO: More efficient dot product solution
+    
+    if threadID <= brains.number_neurons
+        #Input calculation for gates
+        for i = 1:brains.number_inputs
+            #Input Gate
+            gate_results[1, threadID] += brains.W_i[threadID, i, blockID] * input[i]
+            #Forget Gate
+            gate_results[2, threadID] += brains.W_f[threadID, i, blockID] * input[i]
+            #Cell Gate
+            gate_results[3, threadID] += brains.W_c[threadID, i, blockID] * input[i]
+            #Output Gate
+            gate_results[4, threadID] += brains.W_o[threadID, i, blockID] * input[i]
+        end
+
+        #Hidden state calculation for gates 
+        for i = 1:brains.number_neurons
+            #Input Gate
+            gate_results[1, threadID] += brains.U_i[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            #Forget Gate
+            gate_results[2, threadID] += brains.U_f[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            #Cell Gate
+            gate_results[3, threadID] += brains.U_c[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            #Output Gate
+            gate_results[4, threadID] += brains.U_o[threadID, i, blockID] * brains.hidden_state[i, blockID]
+        end
+
+        #Adding Biases
+        gate_results[1, threadID] += brains.b_i[threadID, blockID]
+        gate_results[2, threadID] += brains.b_f[threadID, blockID]
+        gate_results[3, threadID] += brains.b_c[threadID, blockID]
+        gate_results[4, threadID] += brains.b_o[threadID, blockID]
+        
+        #Applying activation functions
+        gate_results[1, threadID] = sigmoid(gate_results[1, threadID])
+        gate_results[2, threadID] = sigmoid(gate_results[2, threadID])
+        gate_results[3, threadID] = tanh(gate_results[3, threadID])
+        gate_results[4, threadID] = sigmoid(gate_results[4, threadID])
+
+        #New Cell state 
+        brains.cell_state[threadID, blockID] = gate_results[2, threadID] * brains.cell_state[threadID, blockID] + gate_results[1, threadID] * gate_results[3, threadID]
+
+        #Hidden states
+        brains.hidden_state[threadID, blockID] = gate_results[4, threadID] * tanh(brains.cell_state[threadID, blockID])
+
+    end
+
+    #Output Layer
+    if threadID <= brains.number_outputs
+        for i = 1:brains.number_neurons
+            output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
+        end
+        output[threadID] += brains.b_v[threadID, blockID]
+        output[threadID] = tanh(output[threadID])
+    end    
 
 end
+
 
 function reset(threadID, blockID, brains::LongShortTermMemoryNN)
 
     if threadID <= brains.number_neurons
-        brains.hidden[threadID, blockID] = 0.0
+        brains.hidden_state[threadID, blockID] = 0.0
     end 
 
     sync_threads()
@@ -116,14 +175,14 @@ end
 
 function get_individual_size(brains::LongShortTermMemoryNN)
     return 4 * brains.number_inputs * brains.number_neurons +       #Input weights
-        4 * brains.number_neurons * brains.number_neurons +         #Hidden weights
+        4 * brains.number_neurons * brains.number_neurons +         #hidden_state weights
         4 * brains.number_neurons +                                 #Biases
         brains.number_outputs * brains.number_neurons +             #Output layer weights
         brains.number_outputs
 end
 
 function get_required_threads(brains::LongShortTermMemoryNN)
-    return brains.number_neurons
+    return max(brains.number_neurons, brains.number_inputs, brains.number_outputs)
 end
 
 function sigmoid(x)
