@@ -7,7 +7,6 @@ include("../brains/long_short_term_memory_nn.jl")
 
 #GGF gegen python testen mit "Pycall"
 
-
 function kernel_test_brain_initialize(individuals, brains)
 
     threadID = threadIdx().x
@@ -64,7 +63,6 @@ function kernel_test_brain_step(inputs, outputs, brains::LongShortTermMemoryNN, 
 end
 
 function cpu_lstm_step(cell_state, hidden_state, input, W, U, b, individual)
-    #TODO Implementierung vergleichen
     #Input Gate
     i = sigmoid.(W[1] * input + b[1] + U[1] * hidden_state[:, individual])
 
@@ -87,7 +85,7 @@ end
     number_outputs = 6
     number_individuals = 100
 
-    number_time_steps = 200
+    number_time_steps = 1000
     
     brains = LongShortTermMemoryNN(number_neurons, number_inputs, number_outputs, number_individuals)
 
@@ -102,9 +100,16 @@ end
     #Brain initialization tests
     #------------------------------------------------------------------------------------------------------------------------
 
+    #------------------
+    #GPU initialization
+    #------------------
     @cuda threads = number_threads blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
 
     CUDA.synchronize()
+
+    #------------------
+    #CPU initialization
+    #------------------
 
     W_i = zeros(number_neurons, number_inputs, number_individuals)
     W_f = zeros(number_neurons, number_inputs, number_individuals)
@@ -121,9 +126,12 @@ end
     b_o = zeros(number_neurons, number_individuals)
     b_c = zeros(number_neurons, number_individuals)
 
+    hidden_states = zeros(Float32, (number_neurons, number_individuals))
+    cell_states = zeros(Float32, (number_neurons, number_individuals))
+
     V = zeros(number_outputs, number_neurons, number_individuals)
     b_v = zeros(number_outputs, number_individuals)
-
+    
 
     for j = 1:number_individuals
 
@@ -180,7 +188,7 @@ end
         @test offset == individual_size
     end
     
-    #Testing weightmatrices of lstm layer
+    #Testing weightmatrices of lstm layers between GPU and CPU
     @test W_i ≈ Array(brains.W_i) rtol = 0.00001
     @test W_f ≈ Array(brains.W_f) rtol = 0.00001 
     @test W_o ≈ Array(brains.W_o) rtol = 0.00001 
@@ -200,16 +208,60 @@ end
     #Testing weightmatrices & bias of output layer
     @test V ≈ Array(brains.V) rtol = 0.00001
     @test b_v ≈ Array(brains.b_v) rtol = 0.00001
+
+    #------------------
+    #Flux initialization
+    #------------------
+    flux_lstm = Vector{Chain}(undef, number_individuals)
+
+    for j = 1:number_individuals
+        #Initializing Flux LSTM Layer for every individual
+        flux_lstm_layer = LSTM(number_inputs, number_neurons)
+
+        #No constructor for weight initialization available for LSTM
+        #Weights of LSTM layer are initialized by accessing the LSTM Cell struct
+        #https://github.com/FluxML/Flux.jl/blob/master/src/layers/recurrent.jl#L280
+        flux_lstm_layer.cell.Wi[1:number_neurons, :] = W_i[:, :, j] 
+        flux_lstm_layer.cell.Wi[number_neurons + 1 : 2 * number_neurons, :] = W_f[:, :, j] 
+        flux_lstm_layer.cell.Wi[2 * number_neurons + 1 : 3 * number_neurons, :] = W_c[:, :, j]
+        flux_lstm_layer.cell.Wi[3 * number_neurons + 1 : 4 * number_neurons, :] = W_o[:, :, j]
+
+        flux_lstm_layer.cell.Wh[1:number_neurons, :] = U_i[:, :, j] 
+        flux_lstm_layer.cell.Wh[number_neurons + 1 : 2 * number_neurons, :] = U_f[:, :, j] 
+        flux_lstm_layer.cell.Wh[2 * number_neurons + 1 : 3 * number_neurons, :] = U_c[:, :, j]
+        flux_lstm_layer.cell.Wh[3 * number_neurons + 1 : 4 * number_neurons, :] = U_o[:, :, j]
+
+        flux_lstm_layer.cell.b[1 : number_neurons] = b_i[:, j]
+        flux_lstm_layer.cell.b[number_neurons + 1 : 2 * number_neurons] = b_f[:, j]
+        flux_lstm_layer.cell.b[2 * number_neurons + 1 : 3 * number_neurons] = b_c[:, j]
+        flux_lstm_layer.cell.b[3 * number_neurons + 1 : 4 * number_neurons] = b_o[:, j]
+
+        flux_lstm_layer.cell.state0[1] .= hidden_states[:, j]
+
+        #Testing initial parameters of flux LSTM layer
+        @test flux_lstm_layer.cell.Wi ≈ [W_i[:, :, j]; W_f[:, :, j]; W_c[:, :, j]; W_o[:, :, j]] rtol = 0.00001
+        @test flux_lstm_layer.cell.Wh ≈ [U_i[:, :, j]; U_f[:, :, j]; U_c[:, :, j]; U_o[:, :, j]] rtol = 0.00001
+        @test flux_lstm_layer.cell.b ≈ [b_i[:, j]; b_f[:, j]; b_c[:, j]; b_o[:, j]] rtol = 0.00001
+        @test flux_lstm_layer.cell.state0[1] ≈ hidden_states[:, j] rtol = 0.00001
+        @test flux_lstm_layer.cell.state0[2] ≈ cell_states[:, j] rtol = 0.00001
+
+        #Outputlayer directly initialized
+        flux_output_layer = Dense(V[:, :, j], b_v[:, j], tanh)
+
+        #Testing initial parameters of flux output layer
+        @test flux_output_layer.weight ≈ V[:, :, j] rtol = 0.00001
+        @test flux_output_layer.bias ≈ b_v[:, j] rtol = 0.00001
+
+        #Combining Layers and add to Array
+        flux_lstm[j] = Chain(flux_lstm_layer, flux_output_layer)   
+    end
+
     
     
     #------------------------------------------------------------------------------------------------------------------------
     #Brain step tests
     #------------------------------------------------------------------------------------------------------------------------
     #Comparing outputs of the Gpu & Cpu implementations against Flux
-
-
-    hidden_states = zeros(Float32, (number_neurons, number_individuals))
-    cell_states = zeros(Float32, (number_neurons, number_individuals))
     
     output = zeros(number_outputs, number_individuals)
     output_gpu = CuArray(output)
@@ -224,39 +276,18 @@ end
         sizeof(Float32) * brains.number_outputs +
         sizeof(Float32) * brains.number_neurons * 4
     
+    #------------------    
     #GPU Brain step
+    #------------------
     @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
 
+
     for j = 1:number_individuals
-
-        #Flux LSTM layer weight initialization
-        #TODO 
-        flux_lstm_cell = Flux.LSTMCell(number_inputs, number_neurons)
-
-        flux_lstm_cell.Wi[1:number_neurons, :] = W_i[:, :, j] 
-        flux_lstm_cell.Wi[number_neurons + 1 : 2 * number_neurons, :] = W_f[:, :, j] 
-        flux_lstm_cell.Wi[2 * number_neurons + 1 : 3 * number_neurons, :] = W_c[:, :, j]
-        flux_lstm_cell.Wi[3 * number_neurons + 1 : 4 * number_neurons, :] = W_o[:, :, j]
-
-        flux_lstm_cell.Wh[1:number_neurons, :] = U_i[:, :, j] 
-        flux_lstm_cell.Wh[number_neurons + 1 : 2 * number_neurons, :] = U_f[:, :, j] 
-        flux_lstm_cell.Wh[2 * number_neurons + 1 : 3 * number_neurons, :] = U_c[:, :, j]
-        flux_lstm_cell.Wh[3 * number_neurons + 1 : 4 * number_neurons, :] = U_o[:, :, j]
-
-        flux_lstm_cell.b[1 : number_neurons] = b_i[:, j]
-        flux_lstm_cell.b[number_neurons + 1 : 2 * number_neurons] = b_f[:, j]
-        flux_lstm_cell.b[2 * number_neurons + 1 : 3 * number_neurons] = b_c[:, j]
-        flux_lstm_cell.b[3 * number_neurons + 1 : 4 * number_neurons] = b_o[:, j]
-
-        flux_lstm_cell.state0[1] .= hidden_states[:, j]
-
-        #Testing initial parameters
-        @test flux_lstm_cell.Wi ≈ [W_i[:, :, j]; W_f[:, :, j]; W_c[:, :, j]; W_o[:, :, j]] rtol = 0.00001
-        @test flux_lstm_cell.Wh ≈ [U_i[:, :, j]; U_f[:, :, j]; U_c[:, :, j]; U_o[:, :, j]] rtol = 0.00001
-        @test flux_lstm_cell.b ≈ [b_i[:, j]; b_f[:, j]; b_c[:, j]; b_o[:, j]] rtol = 0.00001
-        @test flux_lstm_cell.state0[1] ≈ hidden_states[:, j] rtol = 0.00001
-        @test flux_lstm_cell.state0[2] ≈ cell_states[:, j] rtol = 0.00001
         
+        #------------------    
+        #CPU Brain step
+        #------------------
+
         #cpu_lstm_step
         W = (W_i[:, :, j], W_f[:, :, j], W_c[:, :, j], W_o[:, :, j])
         U = (U_i[:, :, j], U_f[:, :, j], U_c[:, :, j], U_o[:, :, j])
@@ -267,19 +298,10 @@ end
         #CPU Output Layer step
         output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
 
-        #Building Flux LSTM 
-        #TODO: erklärung
-        #Code annotation
-        #https://github.com/FluxML/Flux.jl/blob/master/src/layers/recurrent.jl#L253
-        flux_lstm_layer = Flux.Recur(flux_lstm_cell)
-
-        #Testing cpu outputs of lstm layer against flux
-        #@test flux_lstm_layer(input[:, j]) ≈ hidden_states[:, j] rtol = 0.00001
-        
-        flux_output_layer = Dense(V[:, :, j], b_v[:, j], tanh)
-        flux_lstm = Chain(flux_lstm_layer, flux_output_layer)
-
-        output_flux[:, j] = flux_lstm(input[:, j])
+        #------------------    
+        #Flux Brain step
+        #------------------
+        output_flux[:, j] = flux_lstm[j](input[:, j])
 
         #Testing cpu output of output layer against flux
         @test output_flux[:, j] ≈ output[:, j] rtol = 0.00001
@@ -291,12 +313,12 @@ end
         @test Array(brains.hidden_state[:, j]) ≈ hidden_states[:, j] rtol = 0.00001
         @test Array(brains.cell_state[:, j]) ≈ cell_states[:, j] rtol = 0.00001
 
-        @test Array(brains.hidden_state[:, j]) ≈ flux_lstm_layer.state[1] rtol = 0.00001
-        @test Array(brains.cell_state[:, j]) ≈ flux_lstm_layer.state[2] rtol = 0.00001
+        @test Array(brains.hidden_state[:, j]) ≈ flux_lstm[j].layers[1].state[1] rtol = 0.00001
+        @test Array(brains.cell_state[:, j]) ≈  flux_lstm[j].layers[1].state[2] rtol = 0.00001
         
         #Testing output with new input
         input[:, j] = randn(Float32, brains.number_inputs)
-        output_flux[:, j] = flux_lstm(input[:, j])
+        output_flux[:, j] = flux_lstm[j](input[:, j])
 
         cpu_lstm_step(cell_states, hidden_states, input[:, j], W, U, b, j)
         output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
@@ -313,5 +335,37 @@ end
     #Testing state maintenance
     @test Array(brains.hidden_state) ≈ hidden_states rtol = 0.00001
     @test Array(brains.cell_state) ≈ cell_states rtol = 0.00001
+
+    #Testing for multiple time steps
+    for i = 1:number_time_steps
+        #GPU step
+        @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
+
+        for j = 1:number_individuals
+            #CPU step
+            W = (W_i[:, :, j], W_f[:, :, j], W_c[:, :, j], W_o[:, :, j])
+            U = (U_i[:, :, j], U_f[:, :, j], U_c[:, :, j], U_o[:, :, j])
+            b = (b_i[:, j], b_f[:, j], b_c[:, j], b_o[:, j])
+
+            cpu_lstm_step(cell_states, hidden_states, input[:, j], W, U, b, j)
+            output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
+
+            #Flux step
+            output_flux[:, j] = flux_lstm[j](input[:, j])
+
+            #Align states since they drift away over time
+            flux_lstm[j].layers[1].state[1] .= Array(brains.hidden_state[:, j])
+            flux_lstm[j].layers[1].state[2] .= Array(brains.cell_state[:, j])
+            
+            cell_states[:, j] = Array(brains.cell_state[:, j])
+            hidden_states[:, j] = Array(brains.hidden_state[:, j])
+        end
+
+        #Tests
+        @test output_flux ≈ output rtol = 0.00001
+        @test Array(output_gpu) ≈ output_flux rtol = 0.00001
+
+    end    
+
 
 end    
