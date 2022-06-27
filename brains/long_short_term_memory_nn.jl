@@ -105,7 +105,6 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 end
 
 function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, input, output)
-    #TODO: More efficient dot product solution
     
     if threadID <= brains.number_neurons
         #Input calculation for gates
@@ -165,12 +164,10 @@ end
 
 
 function reset(threadID, blockID, brains::LongShortTermMemoryNN)
-
     if threadID <= brains.number_neurons
+        brains.cell_state[threadID, blockID] = 0.0
         brains.hidden_state[threadID, blockID] = 0.0
     end 
-
-    sync_threads()
 end
 
 function get_individual_size(brains::LongShortTermMemoryNN)
@@ -178,7 +175,7 @@ function get_individual_size(brains::LongShortTermMemoryNN)
         4 * brains.number_neurons * brains.number_neurons +         #hidden_state weights
         4 * brains.number_neurons +                                 #Biases
         brains.number_outputs * brains.number_neurons +             #Output layer weights
-        brains.number_outputs
+        brains.number_outputs                                       #Output bias
 end
 
 function get_required_threads(brains::LongShortTermMemoryNN)
