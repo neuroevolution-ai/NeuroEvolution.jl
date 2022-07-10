@@ -2,6 +2,7 @@ using Test
 using Flux
 using CUDA
 using DataStructures
+using Random
 
 include("../brains/long_short_term_memory_nn.jl")
 
@@ -89,9 +90,9 @@ end
     number_neurons = 10
     number_inputs = 30
     number_outputs = 6
-    number_individuals = 300
+    number_individuals = 100
 
-    number_time_steps = 500
+    number_time_steps = 100
 
     brains = LongShortTermMemoryNN(
         number_neurons,
@@ -311,6 +312,7 @@ end
 
     gate_results = CUDA.fill(0.0f0, (4, number_neurons, number_individuals))
 
+    #Random.seed!(1)
     input = randn(Float32, number_inputs, number_individuals)
     input_gpu = CuArray(input)
 
@@ -393,7 +395,8 @@ end
 
     #Testing for multiple time steps
     for i = 1:number_time_steps
-
+        input = randn(Float32, number_inputs, number_individuals)
+        input_gpu = CuArray(input)
         @cuda threads = number_threads blocks = number_individuals shmem =
             shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
         CUDA.synchronize()
@@ -421,7 +424,7 @@ end
 
         #Comparing Outputs in every timestep
         @test output_flux ≈ output rtol = 0.00001
-        @test Array(output_gpu) ≈ output rtol = 0.00001
+        #@test Array(output_gpu) ≈ output rtol = 0.00001
         @test Array(output_gpu) ≈ output_flux rtol = 0.00001
 
     end
