@@ -92,7 +92,7 @@ end
     number_outputs = 6
     number_individuals = 100
 
-    number_time_steps = 100
+    number_time_steps = 200
 
     brains = LongShortTermMemoryNN(
         number_neurons,
@@ -103,6 +103,7 @@ end
 
     individual_size = get_individual_size(brains)
 
+    #Random.seed!(1)
     individuals = randn(number_individuals, individual_size)
     individuals_gpu = CuArray(individuals)
 
@@ -303,102 +304,27 @@ end
 
     #------------------------------------------------------------------------------------------------------------------------
     #Brain step tests
+    #Comparing outputs of the Gpu against Cpu implementation and Flux
     #------------------------------------------------------------------------------------------------------------------------
-    #Comparing outputs of the Gpu & Cpu implementations against Flux
-
-    output = zeros(number_outputs, number_individuals)
-    output_gpu = CuArray(output)
-    output_flux = zeros(number_outputs, number_individuals)
-
-    gate_results = CUDA.fill(0.0f0, (4, number_neurons, number_individuals))
-
-    #Random.seed!(1)
-    input = randn(Float32, number_inputs, number_individuals)
-    input_gpu = CuArray(input)
 
     shared_memory_size =
         sizeof(Float32) * brains.number_inputs +
         sizeof(Float32) * brains.number_outputs +
         sizeof(Float32) * brains.number_neurons * 4
 
-    #------------------    
-    #GPU Brain step
-    #------------------
-    @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(
-        input_gpu,
-        output_gpu,
-        brains,
-        gate_results,
-    )
-    CUDA.synchronize()
-
-    for j = 1:number_individuals
-
-        #------------------    
-        #CPU Brain step
-        #------------------
-
-        #cpu_lstm_step
-        W = (W_i[:, :, j], W_f[:, :, j], W_c[:, :, j], W_o[:, :, j])
-        U = (U_i[:, :, j], U_f[:, :, j], U_c[:, :, j], U_o[:, :, j])
-        b = (b_i[:, j], b_f[:, j], b_c[:, j], b_o[:, j])
-
-        cpu_lstm_step(cell_states, hidden_states, input[:, j], W, U, b, j)
-
-        #CPU Output Layer step
-        output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
-
-        #------------------    
-        #Flux Brain step
-        #------------------
-        output_flux[:, j] = flux_lstm[j](input[:, j])
-
-        #Testing cpu output of output layer against flux
-        @test output_flux[:, j] ≈ output[:, j] rtol = 0.00001
-
-        #Testing GPU output against Flux
-        @test Array(output_gpu[:, j]) ≈ output_flux[:, j] rtol = 0.00001
-
-        #Testing state maintenance
-        @test Array(brains.hidden_state[:, j]) ≈ hidden_states[:, j] rtol = 0.00001
-        @test Array(brains.cell_state[:, j]) ≈ cell_states[:, j] rtol = 0.00001
-
-        @test Array(brains.hidden_state[:, j]) ≈ flux_lstm[j].layers[1].state[1] rtol = 0.00001
-        @test Array(brains.cell_state[:, j]) ≈ flux_lstm[j].layers[1].state[2] rtol = 0.00001
-
-        #Testing output with new input
-        input[:, j] = randn(Float32, brains.number_inputs)
-        output_flux[:, j] = flux_lstm[j](input[:, j])
-
-        cpu_lstm_step(cell_states, hidden_states, input[:, j], W, U, b, j)
-        output[:, j] = tanh.(V[:, :, j] * hidden_states[:, j] + b_v[:, j])
-
-        @test output_flux[:, j] ≈ output[:, j] rtol = 0.00001
-    end
-
-    input_gpu = CuArray(input)
-
-    @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(
-        input_gpu,
-        output_gpu,
-        brains,
-        gate_results,
-    )
-    CUDA.synchronize()
-
-    @test Array(output_gpu) ≈ output rtol = 0.00001
-    @test Array(output_gpu) ≈ output_flux rtol = 0.00001
-
-    #Testing state maintenance
-    @test Array(brains.hidden_state) ≈ hidden_states rtol = 0.00001
-    @test Array(brains.cell_state) ≈ cell_states rtol = 0.00001
-
     #Testing for multiple time steps
     for i = 1:number_time_steps
         input = randn(Float32, number_inputs, number_individuals)
         input_gpu = CuArray(input)
-        @cuda threads = number_threads blocks = number_individuals shmem =
-            shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
+
+        output = zeros(Float32, number_outputs, number_individuals)
+        output_flux = zeros(number_outputs, number_individuals)
+        output_gpu = CuArray(zeros(Float32, number_outputs, number_individuals))
+
+        gate_results = CUDA.fill(0.0f0, (4, number_neurons, number_individuals))
+
+        #GPU step
+        @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains, gate_results)
         CUDA.synchronize()
 
         for j = 1:number_individuals
@@ -413,6 +339,10 @@ end
 
             #Flux step
             output_flux[:, j] = flux_lstm[j](input[:, j])
+            
+            #Comparing Outputs
+            @test output_flux[:, j] ≈ output[:, j] rtol = 0.00001
+            @test output_flux[:, j] ≈ Array(output_gpu[:, j]) rtol = 0.00001
 
             #Align states since they drift away over time
             flux_lstm[j].layers[1].state[1] .= Array(brains.hidden_state[:, j])
@@ -421,11 +351,6 @@ end
             cell_states[:, j] .= Array(brains.cell_state[:, j])
             hidden_states[:, j] .= Array(brains.hidden_state[:, j])
         end
-
-        #Comparing Outputs in every timestep
-        @test output_flux ≈ output rtol = 0.00001
-        #@test Array(output_gpu) ≈ output rtol = 0.00001
-        @test Array(output_gpu) ≈ output_flux rtol = 0.00001
 
     end
 

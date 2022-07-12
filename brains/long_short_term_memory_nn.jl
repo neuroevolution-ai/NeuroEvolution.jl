@@ -107,16 +107,21 @@ end
 function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, input, output)
     
     if threadID <= brains.number_neurons
+        gate_results[1, threadID] = 0.0
+        gate_results[2, threadID] = 0.0
+        gate_results[3, threadID] = 0.0
+        gate_results[4, threadID] = 0.0
+
         #Input calculation for gates
         for i = 1:brains.number_inputs
             #Input Gate
-            gate_results[1, threadID] += brains.W_i[threadID, i, blockID] * input[i]
+            @inbounds gate_results[1, threadID] += brains.W_i[threadID, i, blockID] * input[i]
             #Forget Gate
-            gate_results[2, threadID] += brains.W_f[threadID, i, blockID] * input[i]
+            @inbounds gate_results[2, threadID] += brains.W_f[threadID, i, blockID] * input[i]
             #Cell Gate
-            gate_results[3, threadID] += brains.W_c[threadID, i, blockID] * input[i]
+            @inbounds gate_results[3, threadID] += brains.W_c[threadID, i, blockID] * input[i]
             #Output Gate
-            gate_results[4, threadID] += brains.W_o[threadID, i, blockID] * input[i]
+            @inbounds gate_results[4, threadID] += brains.W_o[threadID, i, blockID] * input[i]
         end
 
         #Hidden state calculation for gates 
@@ -136,7 +141,7 @@ function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, in
         gate_results[2, threadID] += brains.b_f[threadID, blockID]
         gate_results[3, threadID] += brains.b_c[threadID, blockID]
         gate_results[4, threadID] += brains.b_o[threadID, blockID]
-        
+
         #Applying activation functions
         gate_results[1, threadID] = sigmoid(gate_results[1, threadID])
         gate_results[2, threadID] = sigmoid(gate_results[2, threadID])
@@ -151,8 +156,11 @@ function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, in
 
     end
 
+    sync_threads()
+
     #Output Layer
     if threadID <= brains.number_outputs
+        output[threadID] = 0.0
         for i = 1:brains.number_neurons
             output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
         end
@@ -160,6 +168,7 @@ function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, in
         output[threadID] = tanh(output[threadID])
     end    
 
+    sync_threads()
 end
 
 
