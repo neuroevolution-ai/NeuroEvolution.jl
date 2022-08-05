@@ -64,18 +64,20 @@ function cpu_elman_step(hidden_state, input, W, U, b, individual)
 end
 
 @testset "Elman Network" begin
+    config_brain = OrderedDict()
+    config_brain["number_neurons"] = 10
+    config_brain["number_inputs"] = 30
+    config_brain["number_outputs"] = 6
 
-    number_neurons = 10
-    number_inputs = 30
-    number_outputs = 10
+    number_neurons = config_brain["number_neurons"]
+    number_inputs = config_brain["number_inputs"]
+    number_outputs = config_brain["number_outputs"]
+
     number_individuals = 100
-
     number_time_steps = 1000
 
     brains = ElmanNetwork(
-        number_neurons,
-        number_inputs,
-        number_outputs,
+        config_brain,
         number_individuals,
     )
 

@@ -19,29 +19,24 @@ struct GatedRecurrentUnitNN{A,B,C,D,E}
     number_outputs::Int64
 end
 
-function GatedRecurrentUnitNN(
-    number_neurons::Int,
-    number_inputs::Int,
-    number_outputs::Int,
-    number_individuals::Int,
-)
+function GatedRecurrentUnitNN(configuration::OrderedDict, number_individuals::Int)
 
     GatedRecurrentUnitNN(
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
-        number_neurons,
-        number_inputs,
-        number_outputs,
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], number_individuals)),
+        configuration["number_neurons"],
+        configuration["number_inputs"],
+        configuration["number_outputs"],
     )
 end
 

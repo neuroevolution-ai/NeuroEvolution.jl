@@ -2,29 +2,29 @@ using Adapt
 using LinearAlgebra
 
 struct ElmanNetwork{A, B, C, D, E}
-    number_neurons::Int64
     W::A
     U::B
     b::C
     hidden_state::C
     V::D
     b_v::E
+    number_neurons::Int64
     number_inputs::Int64
     number_outputs::Int64
 end
 
-function ElmanNetwork(number_neurons::Int, number_inputs::Int, number_outputs::Int, number_individuals::Int)
+function ElmanNetwork(configuration::OrderedDict, number_individuals::Int)
 
     ElmanNetwork(
-        number_neurons,
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
-        number_inputs,
-        number_outputs
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], number_individuals)),
+        configuration["number_neurons"],
+        configuration["number_inputs"],
+        configuration["number_outputs"]
     )
 
 end

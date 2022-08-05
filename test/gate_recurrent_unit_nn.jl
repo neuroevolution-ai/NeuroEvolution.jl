@@ -70,17 +70,20 @@ end
 
 @testset "Gated Recurrent Unit Neural Network" begin
 
-    number_neurons = 10
-    number_inputs = 30
-    number_outputs = 6
-    number_individuals = 100
+    config_brain = OrderedDict()
+    config_brain["number_neurons"] = 10
+    config_brain["number_inputs"] = 30
+    config_brain["number_outputs"] = 6
 
+    number_neurons = config_brain["number_neurons"]
+    number_inputs = config_brain["number_inputs"]
+    number_outputs = config_brain["number_outputs"]
+
+    number_individuals = 100
     number_time_steps = 1000
 
     brains = GatedRecurrentUnitNN(
-        number_neurons,
-        number_inputs,
-        number_outputs,
+        config_brain,
         number_individuals,
     )
 

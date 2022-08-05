@@ -2,7 +2,6 @@ using Adapt
 using LinearAlgebra
 
 struct LongShortTermMemoryNN{A, B, C, D, E}
-    number_neurons::Int64
     W_i::A
     W_f::A
     W_o::A
@@ -19,32 +18,33 @@ struct LongShortTermMemoryNN{A, B, C, D, E}
     cell_state::C
     V::D
     b_v::E
+    number_neurons::Int64
     number_inputs::Int64
     number_outputs::Int64
 end
 
-function LongShortTermMemoryNN(number_neurons::Int, number_inputs::Int, number_outputs::Int, number_individuals::Int)
+function LongShortTermMemoryNN(configuration::OrderedDict, number_individuals::Int)
 
     LongShortTermMemoryNN(
-        number_neurons,
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_inputs, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_neurons, number_individuals)),
-        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
-        number_inputs,
-        number_outputs
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_outputs"], number_individuals)),
+        configuration["number_neurons"],
+        configuration["number_inputs"],
+        configuration["number_outputs"],
     )
 end
 
