@@ -92,10 +92,7 @@ end
     #------------------
     #GPU initialization
     #------------------
-    @cuda threads = number_threads blocks = number_individuals kernel_test_brain_initialize(
-        individuals_gpu,
-        brains,
-    )
+    @cuda threads = number_threads blocks = number_individuals kernel_test_brain_initialize(individuals_gpu, brains)
 
     CUDA.synchronize()
 
@@ -123,25 +120,16 @@ end
 
         @test W_size + U_size + b_size + V_size + b_v_size == individual_size
 
-        W[:, :, j] =reshape(
-            view(individuals, j, 1:W_size), 
-            (number_neurons, number_inputs)
-        )
+        W[:, :, j] =reshape(view(individuals, j, 1:W_size), (number_neurons, number_inputs))
         offset = W_size
 
-        U[:, :, j] = reshape(
-            view(individuals, j, offset+1:offset+U_size),
-            (number_neurons, number_neurons),
-        )
+        U[:, :, j] = reshape(view(individuals, j, offset+1:offset+U_size), (number_neurons, number_neurons))
         offset += U_size
 
         b[:, j] = reshape(view(individuals, j, offset+1:b_size+offset), b_size)
         offset += b_size
 
-        V[:, :, j] = reshape(
-            view(individuals, j, offset+1:V_size+offset),
-            (number_outputs, number_neurons),
-        )
+        V[:, :, j] = reshape(view(individuals, j, offset+1:V_size+offset), (number_outputs, number_neurons))
         offset += V_size
 
         b_v[:, j] = reshape(view(individuals, j, offset+1:b_v_size+offset), b_v_size)
@@ -227,18 +215,14 @@ end
         CUDA.synchronize()
 
         for j = 1:number_individuals
-            #------------------    
             #CPU Brain step
-            #------------------
             W_cpu = (W[:, :, j], V[:, :, j])
             U_cpu = U[:, :, j]
             b_cpu = (b[:, j], b_v[:, j])
 
             output_cpu[:, j] = cpu_elman_step(hidden_states, input[:, j], W_cpu, U_cpu, b_cpu, j)
             
-            #------------------    
             #Flux Brain step
-            #------------------
             output_flux[:, j] = flux_elman[j](input[:, j])
 
             #Comparing Outputs in every timestep

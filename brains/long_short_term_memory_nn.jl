@@ -104,14 +104,14 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 
 end
 
-function step(threadID, blockID, brains::LongShortTermMemoryNN, gate_results, input, output)
+function step(threadID, blockID, brains::LongShortTermMemoryNN, input, output, offset_memory)
+
+    gate_results = @cuDynamicSharedMem(Float32, (4, brains.number_neurons), offset_memory)
+    fill!(gate_results, 0.0f0)
+    offset_memory += sizeof(gate_results)
     
     if threadID <= brains.number_neurons
-        gate_results[1, threadID] = 0.0
-        gate_results[2, threadID] = 0.0
-        gate_results[3, threadID] = 0.0
-        gate_results[4, threadID] = 0.0
-
+        
         #Input calculation for gates
         for i = 1:brains.number_inputs
             #Input Gate
@@ -185,6 +185,10 @@ function get_individual_size(brains::LongShortTermMemoryNN)
         4 * brains.number_neurons +                                 #Biases
         brains.number_outputs * brains.number_neurons +             #Output layer weights
         brains.number_outputs                                       #Output bias
+end
+
+function get_memory_requirements(brains::LongShortTermMemoryNN)
+    return sizeof(Float32) * brains.number_neurons * 4
 end
 
 function get_required_threads(brains::LongShortTermMemoryNN)

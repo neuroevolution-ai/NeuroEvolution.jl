@@ -70,14 +70,19 @@ end
 
 @testset "Gated Recurrent Unit Neural Network" begin
 
-    number_neurons = 10 
+    number_neurons = 10
     number_inputs = 30
     number_outputs = 6
     number_individuals = 100
 
     number_time_steps = 1000
-    
-    brains = GatedRecurrentUnitNN(number_neurons, number_inputs, number_outputs, number_individuals)
+
+    brains = GatedRecurrentUnitNN(
+        number_neurons,
+        number_inputs,
+        number_outputs,
+        number_individuals,
+    )
 
     individual_size = get_individual_size(brains)
 
@@ -117,7 +122,7 @@ end
 
     V = zeros(number_outputs, number_neurons, number_individuals)
     b_v = zeros(number_outputs, number_individuals)
-    
+
 
     for j = 1:number_individuals
 
@@ -129,37 +134,37 @@ end
 
         @test 3 * W_size + 3 * U_size + 3 * b_size + V_size + b_v_size == individual_size
 
-        W_r[:, :, j] = reshape(view(individuals, j, 1 : W_size), (number_neurons, number_inputs))
+        W_r[:, :, j] = reshape(view(individuals, j, 1:W_size), (number_neurons, number_inputs))
         offset = W_size
 
-        W_u[:, :, j] = reshape(view(individuals, j, offset + 1 : offset + W_size), (number_neurons, number_inputs))
+        W_u[:, :, j] = reshape(view(individuals, j, offset+1:offset+W_size), (number_neurons, number_inputs))
         offset += W_size
 
-        W_c[:, :, j] = reshape(view(individuals, j, offset + 1 : offset + W_size), (number_neurons, number_inputs))
+        W_c[:, :, j] = reshape(view(individuals, j, offset+1:offset+W_size), (number_neurons, number_inputs))
         offset += W_size
 
-        U_r[:, :, j] = reshape(view(individuals, j, offset + 1 : offset + U_size), (number_neurons, number_neurons))
+        U_r[:, :, j] = reshape(view(individuals, j, offset+1:offset+U_size), (number_neurons, number_neurons))
         offset += U_size
 
-        U_u[:, :, j] = reshape(view(individuals, j, offset + 1 : offset + U_size), (number_neurons, number_neurons))
+        U_u[:, :, j] = reshape(view(individuals, j, offset+1:offset+U_size), (number_neurons, number_neurons))
         offset += U_size
 
-        U_c[:, :, j] = reshape(view(individuals, j, offset + 1 : offset + U_size), (number_neurons, number_neurons))
+        U_c[:, :, j] = reshape(view(individuals, j, offset+1:offset+U_size), (number_neurons, number_neurons))
         offset += U_size
 
-        b_r[:, j] = reshape(view(individuals, j, offset + 1 : b_size + offset), b_size)
+        b_r[:, j] = reshape(view(individuals, j, offset+1:b_size+offset), b_size)
         offset += b_size
 
-        b_u[:, j] = reshape(view(individuals, j, offset + 1 : b_size + offset), b_size)
-        offset += b_size
-        
-        b_c[:, j] = reshape(view(individuals, j, offset + 1 : b_size + offset), b_size)
+        b_u[:, j] = reshape(view(individuals, j, offset+1:b_size+offset), b_size)
         offset += b_size
 
-        V[:, :, j] = reshape(view(individuals, j, offset + 1 : V_size + offset), (number_outputs, number_neurons))
+        b_c[:, j] = reshape(view(individuals, j, offset+1:b_size+offset), b_size)
+        offset += b_size
+
+        V[:, :, j] = reshape(view(individuals, j, offset+1:V_size+offset), (number_outputs, number_neurons))
         offset += V_size
 
-        b_v[:, j] = reshape(view(individuals, j, offset + 1 : b_v_size + offset), b_v_size)
+        b_v[:, j] = reshape(view(individuals, j, offset+1:b_v_size+offset), b_v_size)
         offset += b_v_size
 
         @test offset == individual_size
@@ -168,16 +173,16 @@ end
     #Initialization tests between GPU & CPU
     #Testing weightmatrices
     @test W_r ≈ Array(brains.W_r) rtol = 0.00001
-    @test W_u ≈ Array(brains.W_u) rtol = 0.00001 
+    @test W_u ≈ Array(brains.W_u) rtol = 0.00001
     @test W_c ≈ Array(brains.W_c) rtol = 0.00001
 
-    @test U_r ≈ Array(brains.U_r) rtol = 0.00001 
-    @test U_u ≈ Array(brains.U_u) rtol = 0.00001 
-    @test U_c ≈ Array(brains.U_c) rtol = 0.00001 
+    @test U_r ≈ Array(brains.U_r) rtol = 0.00001
+    @test U_u ≈ Array(brains.U_u) rtol = 0.00001
+    @test U_c ≈ Array(brains.U_c) rtol = 0.00001
 
     #Testing biases
-    @test b_r ≈ Array(brains.b_r) rtol = 0.00001 
-    @test b_u ≈ Array(brains.b_u) rtol = 0.00001 
+    @test b_r ≈ Array(brains.b_r) rtol = 0.00001
+    @test b_u ≈ Array(brains.b_u) rtol = 0.00001
     @test b_c ≈ Array(brains.b_c) rtol = 0.00001
 
     #Testing weightmatrices & bias of output layer
@@ -190,7 +195,7 @@ end
 
     #One flux-chain for each individual
     flux_gru = Vector{Chain}(undef, number_individuals)
-    
+
     #No constructor for weight initialization available for GRU
     #Weights of GRU layer are initialized by accessing the GRU Cell struct
     #https://github.com/FluxML/Flux.jl/blob/master/src/layers/recurrent.jl#L354
@@ -198,30 +203,27 @@ end
     for j = 1:number_individuals
         #Initializing Flux GRU Layer for every individual
         flux_gru_layer = GRU(number_inputs, number_neurons)
-        
+
         #In Flux, first "number_neurons"-rows of Wi are for reset gate weight matrix, next update gate and last for current gate
         #Same for Wh and bias
-        flux_gru_layer.cell.Wi[1:number_neurons, :] = W_r[:, :, j]
-        flux_gru_layer.cell.Wi[number_neurons+1:2*number_neurons, :] = W_u[:, :, j]
-        flux_gru_layer.cell.Wi[2*number_neurons+1:3*number_neurons, :] = W_c[:, :, j]
+        flux_gru_layer.cell.Wi[1 : number_neurons, :] = W_r[:, :, j]
+        flux_gru_layer.cell.Wi[number_neurons + 1 : 2 * number_neurons, :] = W_u[:, :, j]
+        flux_gru_layer.cell.Wi[2 * number_neurons + 1 : 3 * number_neurons, :] = W_c[:, :, j]
 
-        flux_gru_layer.cell.Wh[1:number_neurons, :] = U_r[:, :, j]
-        flux_gru_layer.cell.Wh[number_neurons+1:2*number_neurons, :] = U_u[:, :, j]
-        flux_gru_layer.cell.Wh[2*number_neurons+1:3*number_neurons, :] = U_c[:, :, j]
+        flux_gru_layer.cell.Wh[1 : number_neurons, :] = U_r[:, :, j]
+        flux_gru_layer.cell.Wh[number_neurons + 1 : 2 *number_neurons, :] = U_u[:, :, j]
+        flux_gru_layer.cell.Wh[2 * number_neurons + 1 : 3 * number_neurons, :] = U_c[:, :, j]
 
-        flux_gru_layer.cell.b[1:number_neurons] = b_r[:, j]
-        flux_gru_layer.cell.b[number_neurons+1:2*number_neurons] = b_u[:, j]
-        flux_gru_layer.cell.b[2*number_neurons+1:3*number_neurons] = b_c[:, j]
+        flux_gru_layer.cell.b[1 : number_neurons] = b_r[:, j]
+        flux_gru_layer.cell.b[number_neurons + 1 : 2 * number_neurons] = b_u[:, j]
+        flux_gru_layer.cell.b[2 * number_neurons + 1 : 3 * number_neurons] = b_c[:, j]
 
         flux_gru_layer.cell.state0 .= hidden_states[:, j]
 
         #Testing initial parameters of flux GRU layer
-        @test flux_gru_layer.cell.Wi ≈
-              [W_r[:, :, j]; W_u[:, :, j]; W_c[:, :, j]] rtol = 0.00001
-        @test flux_gru_layer.cell.Wh ≈
-              [U_r[:, :, j]; U_u[:, :, j]; U_c[:, :, j]] rtol = 0.00001
-        @test flux_gru_layer.cell.b ≈ [b_r[:, j]; b_u[:, j]; b_c[:, j]] rtol =
-            0.00001
+        @test flux_gru_layer.cell.Wi ≈ [W_r[:, :, j]; W_u[:, :, j]; W_c[:, :, j]] rtol = 0.00001
+        @test flux_gru_layer.cell.Wh ≈ [U_r[:, :, j]; U_u[:, :, j]; U_c[:, :, j]] rtol = 0.00001
+        @test flux_gru_layer.cell.b ≈ [b_r[:, j]; b_u[:, j]; b_c[:, j]] rtol = 0.00001
         @test flux_gru_layer.cell.state0 ≈ hidden_states[:, j] rtol = 0.00001
 
         #Outputlayer directly initialized
@@ -242,58 +244,20 @@ end
 
     #Comparing outputs of the Gpu & Cpu implementations against Flux
 
-    input = randn(Float32, number_inputs, number_individuals)
-    input_gpu = CuArray(input)
-
-    output_cpu = zeros(number_outputs, number_individuals)
-    output_gpu = CuArray(output_cpu)
-    output_flux = zeros(number_outputs, number_individuals)
-
-    shared_memory_size = get_memory_requirements(brains) + 
+    shared_memory_size =
+        get_memory_requirements(brains) +
         sizeof(Float32) * brains.number_inputs +
-        sizeof(Float32) * brains.number_outputs 
-
-    hidden_states = zeros(Float32, (number_neurons, number_individuals))    
-    gate_results = CUDA.fill(0.0f0, (3, number_neurons, number_individuals))
-
-    #------------------    
-    #GPU Brain step
-    #------------------
-    @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains)
-    CUDA.synchronize()
-
-    for j = 1:number_individuals
-        #------------------    
-        #CPU Brain step
-        #------------------
-        W = (W_r[:, :, j], W_u[:, :, j], W_c[:, :, j], V[:, :, j])
-        U = (U_r[:, :, j], U_u[:, :, j], U_c[:, :, j])
-        b = (b_r[:, j], b_u[:, j], b_c[:, j], b_v[:, j])
-
-        output_cpu[:, j] = cpu_gru_step(hidden_states, input[:, j], W, U, b, j)
-
-        #------------------    
-        #Flux Brain step
-        #------------------
-        output_flux[:, j] = flux_gru[j](input[:, j])
-    end
-
-    #Comparing outputs
-    @test output_flux ≈ output_cpu rtol = 0.00001
-    @test Array(output_gpu) ≈ output_cpu rtol = 0.00001
-    @test Array(output_gpu) ≈ output_flux rtol = 0.00001
-
-    #Testing state maintenance
-    @test Array(brains.hidden_state) ≈ hidden_states rtol = 0.00001
-    for i = 1:number_individuals
-        @test flux_gru[i].layers[1].state ≈ Array(brains.hidden_state[:, i]) rtol = 0.00001
-    end
+        sizeof(Float32) * brains.number_outputs
 
     #Testing multiple timesteps
     for i = 1:number_time_steps
+        
         input = randn(Float32, brains.number_inputs, number_individuals)
         input_gpu = CuArray(input)
-        output_gpu = CuArray(zeros(number_outputs, number_individuals))
+        
+        output_cpu = zeros(number_outputs, number_individuals)
+        output_gpu = CuArray(output_cpu)
+        output_flux = zeros(number_outputs, number_individuals)
 
         #GPU step
         @cuda threads = number_threads blocks = number_individuals shmem = shared_memory_size kernel_test_brain_step(input_gpu, output_gpu, brains)
@@ -306,7 +270,7 @@ end
             b = (b_r[:, j], b_u[:, j], b_c[:, j], b_v[:, j])
 
             output_cpu[:, j] = cpu_gru_step(hidden_states, input[:, j], W, U, b, j)
-            
+
             #Flux step
             output_flux[:, j] = flux_gru[j](input[:, j])
 
@@ -317,9 +281,9 @@ end
             #Align states since they drift away over time
             flux_gru[j].layers[1].state .= Array(brains.hidden_state[:, j])
             hidden_states[:, j] .= Array(brains.hidden_state[:, j])
-        end 
+        end
 
-    end    
+    end
 
 
-end    
+end
