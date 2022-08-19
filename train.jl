@@ -9,6 +9,7 @@ include("environments/collect_points.jl")
 include("environments/dummy_app.jl")
 include("brains/continuous_time_rnn.jl")
 include("brains/feed_forward_nn.jl")
+include("brains/long_short_term_memory_nn.jl")
 include("optimizers/cma_es.jl")
 include("optimizers/randomizer.jl")
 include("tools/episode_runner.jl")
@@ -41,7 +42,7 @@ end
 
 function main()
 
-    configuration_file = "configurations/CMA_ES_Deap_CTRNN_Dense_Dummy_App.json"
+    configuration_file = "configurations/CMA_ES_Deap_LSTM_Dense_Dummy_App.json"
 
     # Load configuration file
     configuration = JSON.parsefile(configuration_file, dicttype = OrderedDict)
@@ -57,6 +58,8 @@ function main()
         brain_type = ContinuousTimeRNN
     elseif configuration["brain"]["type"] == "FFNN"
         brain_type = FeedForwardNN
+    elseif configuration["brain"]["type"] == "LSTM"
+        brain_type = LongShortTermMemoryNN
     else
         error("No valid brain type")
     end
