@@ -23,13 +23,13 @@ struct LongShortTermMemoryNN{A, B, C, D, E}
     number_outputs::Int64
 end
 
-function LongShortTermMemoryNN(configuration::OrderedDict, number_individuals::Int)
+function LongShortTermMemoryNN(configuration::OrderedDict, number_inputs::Int, number_outputs::Int, number_individuals::Int)
 
     LongShortTermMemoryNN(
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
@@ -40,17 +40,28 @@ function LongShortTermMemoryNN(configuration::OrderedDict, number_individuals::I
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_outputs"], configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_outputs"], number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
         configuration["number_neurons"],
-        configuration["number_inputs"],
-        configuration["number_outputs"],
+        number_inputs,
+        number_outputs,
     )
 end
 
 Adapt.@adapt_structure LongShortTermMemoryNN
 
-function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individuals)
+function get_required_threads(brains::LongShortTermMemoryNN)
+    return max(brains.number_neurons, brains.number_inputs, brains.number_outputs)
+end
+
+function get_memory_requirements(brains::LongShortTermMemoryNN)
+    return sizeof(Float32) * brains.number_neurons * 4
+end
+
+function initialize(brains::LongShortTermMemoryNN, individuals)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     w_size = brains.number_inputs * brains.number_neurons
     u_size = brains.number_neurons * brains.number_neurons
@@ -98,13 +109,27 @@ function initialize(threadID, blockID, brains::LongShortTermMemoryNN, individual
 
     sync_threads()
 
-    reset(threadID, blockID, brains)
+    reset(brains)
 
     sync_threads()
 
 end
 
-function step(threadID, blockID, brains::LongShortTermMemoryNN, input, output, offset_memory)
+function reset(brains::LongShortTermMemoryNN)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
+
+    if threadID <= brains.number_neurons
+        brains.cell_state[threadID, blockID] = 0.0
+        brains.hidden_state[threadID, blockID] = 0.0
+    end 
+end
+
+function step(brains::LongShortTermMemoryNN, input, output, offset_memory)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     gate_results = @cuDynamicSharedMem(Float32, (4, brains.number_neurons), offset_memory)
     fill!(gate_results, 0.0f0)
@@ -171,28 +196,12 @@ function step(threadID, blockID, brains::LongShortTermMemoryNN, input, output, o
     sync_threads()
 end
 
-
-function reset(threadID, blockID, brains::LongShortTermMemoryNN)
-    if threadID <= brains.number_neurons
-        brains.cell_state[threadID, blockID] = 0.0
-        brains.hidden_state[threadID, blockID] = 0.0
-    end 
-end
-
 function get_individual_size(brains::LongShortTermMemoryNN)
     return 4 * brains.number_inputs * brains.number_neurons +       #Input weights
         4 * brains.number_neurons * brains.number_neurons +         #hidden_state weights
         4 * brains.number_neurons +                                 #Biases
         brains.number_outputs * brains.number_neurons +             #Output layer weights
         brains.number_outputs                                       #Output bias
-end
-
-function get_memory_requirements(brains::LongShortTermMemoryNN)
-    return sizeof(Float32) * brains.number_neurons * 4
-end
-
-function get_required_threads(brains::LongShortTermMemoryNN)
-    return max(brains.number_neurons, brains.number_inputs, brains.number_outputs)
 end
 
 function sigmoid(x)

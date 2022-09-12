@@ -8,11 +8,7 @@ include("../brains/elman_network.jl")
 
 function kernel_test_brain_initialize(individuals, brains)
 
-    threadID = threadIdx().x
-    blockID = blockIdx().x
-
-
-    initialize(threadID, blockID, brains, individuals)
+    initialize(brains, individuals)
 
     sync_threads()
 
@@ -40,7 +36,7 @@ function kernel_test_brain_step(inputs, outputs, brains::ElmanNetwork)
 
     sync_threads()
 
-    step(threadID, blockID, brains, input, output, offset_memory)
+    step(brains, input, output, offset_memory)
 
     sync_threads()
 
@@ -66,18 +62,18 @@ end
 @testset "Elman Network" begin
     config_brain = OrderedDict()
     config_brain["number_neurons"] = 10
-    config_brain["number_inputs"] = 30
-    config_brain["number_outputs"] = 6
 
     number_neurons = config_brain["number_neurons"]
-    number_inputs = config_brain["number_inputs"]
-    number_outputs = config_brain["number_outputs"]
+    number_inputs = 30
+    number_outputs = 6
 
     number_individuals = 100
     number_time_steps = 1000
 
     brains = ElmanNetwork(
         config_brain,
+        number_inputs,
+        number_outputs,
         number_individuals,
     )
 

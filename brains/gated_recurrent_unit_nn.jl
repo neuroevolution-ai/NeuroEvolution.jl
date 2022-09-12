@@ -19,12 +19,12 @@ struct GatedRecurrentUnitNN{A,B,C,D,E}
     number_outputs::Int64
 end
 
-function GatedRecurrentUnitNN(configuration::OrderedDict, number_individuals::Int)
+function GatedRecurrentUnitNN(configuration::OrderedDict, number_inputs::Int, number_outputs::Int, number_individuals::Int)
 
     GatedRecurrentUnitNN(
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_inputs"], number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
+        CUDA.fill(0.0f0, (configuration["number_neurons"], number_inputs, number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], configuration["number_neurons"], number_individuals)),
@@ -32,17 +32,28 @@ function GatedRecurrentUnitNN(configuration::OrderedDict, number_individuals::In
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
         CUDA.fill(0.0f0, (configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_outputs"], configuration["number_neurons"], number_individuals)),
-        CUDA.fill(0.0f0, (configuration["number_outputs"], number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, configuration["number_neurons"], number_individuals)),
+        CUDA.fill(0.0f0, (number_outputs, number_individuals)),
         configuration["number_neurons"],
-        configuration["number_inputs"],
-        configuration["number_outputs"],
+        number_inputs,
+        number_outputs,
     )
 end
 
 Adapt.@adapt_structure GatedRecurrentUnitNN
 
-function initialize(threadID, blockID, brains::GatedRecurrentUnitNN, individuals)
+function get_required_threads(brains::GatedRecurrentUnitNN)
+    return max(brains.number_neurons, brains.number_inputs, brains.number_outputs)
+end
+
+function get_memory_requirements(brains::GatedRecurrentUnitNN)
+    return sizeof(Float32) * brains.number_neurons * 3
+end
+
+function initialize(brains::GatedRecurrentUnitNN, individuals)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     w_size = brains.number_inputs * brains.number_neurons
     u_size = brains.number_neurons * brains.number_neurons
@@ -87,14 +98,27 @@ function initialize(threadID, blockID, brains::GatedRecurrentUnitNN, individuals
     sync_threads()
 
     if threadID <= brains.number_neurons
-        reset(threadID, blockID, brains)
+        reset(brains)
     end
 
     sync_threads()
 
 end
 
-function step(threadID, blockID, brains::GatedRecurrentUnitNN, input, output, offset_memory)
+function reset(brains::GatedRecurrentUnitNN)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
+
+    if threadID <= brains.number_neurons
+        brains.hidden_state[threadID, blockID] = 0.0
+    end
+end
+
+function step(brains::GatedRecurrentUnitNN, input, output, offset_memory)
+
+    threadID = threadIdx().x
+    blockID = blockIdx().x
 
     gate_results = @cuDynamicSharedMem(Float32, (3, brains.number_neurons), offset_memory)
     fill!(gate_results, 0.0f0)
@@ -157,26 +181,12 @@ function step(threadID, blockID, brains::GatedRecurrentUnitNN, input, output, of
 
 end
 
-function reset(threadID, blockID, brains::GatedRecurrentUnitNN)
-    if threadID <= brains.number_neurons
-        brains.hidden_state[threadID, blockID] = 0.0
-    end
-end
-
 function get_individual_size(brains::GatedRecurrentUnitNN)
     return 3 * brains.number_inputs * brains.number_neurons +       #Input weights
            3 * brains.number_neurons * brains.number_neurons +         #hidden_state weights
            3 * brains.number_neurons +                                 #Biases
            brains.number_outputs * brains.number_neurons +             #Output layer weights
            brains.number_outputs                                       #Output bias
-end
-
-function get_memory_requirements(brains::GatedRecurrentUnitNN)
-    return sizeof(Float32) * brains.number_neurons * 3
-end
-
-function get_required_threads(brains::GatedRecurrentUnitNN)
-    return max(brains.number_neurons, brains.number_inputs, brains.number_outputs)
 end
 
 function sigmoid(x)

@@ -8,10 +8,11 @@ include("../brains/long_short_term_memory_nn.jl")
 
 function kernel_test_brain_initialize(individuals, brains)
 
-    threadID = threadIdx().x
-    blockID = blockIdx().x
+    initialize(brains, individuals)
 
-    initialize(threadID, blockID, brains, individuals)
+    sync_threads()
+
+    reset(brains)
 
     sync_threads()
 
@@ -39,7 +40,7 @@ function kernel_test_brain_step(inputs, outputs, brains::LongShortTermMemoryNN)
 
     sync_threads()
 
-    step(threadID, blockID, brains, input, output, offset_memory)
+    step(brains, input, output, offset_memory)
 
     sync_threads()
 
@@ -71,18 +72,18 @@ end
 
     config_brain = OrderedDict()
     config_brain["number_neurons"] = 10
-    config_brain["number_inputs"] = 30
-    config_brain["number_outputs"] = 6
 
     number_neurons = config_brain["number_neurons"]
-    number_inputs = config_brain["number_inputs"]
-    number_outputs = config_brain["number_outputs"]
+    number_inputs = 30
+    number_outputs = 6
 
     number_individuals = 100
     number_time_steps = 1000
 
     brains = LongShortTermMemoryNN(
         config_brain,
+        number_inputs,
+        number_outputs,
         number_individuals,
     )
 
