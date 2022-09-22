@@ -64,35 +64,35 @@ function initialize(brains::GatedRecurrentUnitNN, individuals)
 
     if threadID <= brains.number_neurons
         for i = 1:brains.number_inputs
-            brains.W_r[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+offset]
-            brains.W_u[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+1*w_size+offset]
-            brains.W_c[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+2*w_size+offset]
+            @inbounds brains.W_r[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+offset]
+            @inbounds brains.W_u[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+1*w_size+offset]
+            @inbounds brains.W_c[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+2*w_size+offset]
         end
 
         offset += 3 * w_size
 
         for i = 1:brains.number_neurons
-            brains.U_r[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+offset]
-            brains.U_u[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+1*u_size+offset]
-            brains.U_c[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+2*u_size+offset]
+            @inbounds brains.U_r[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+offset]
+            @inbounds brains.U_u[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+1*u_size+offset]
+            @inbounds brains.U_c[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_neurons+2*u_size+offset]
         end
 
         offset += 3 * u_size
 
-        brains.b_r[threadID, blockID] = individuals[blockID, threadID+offset]
-        brains.b_u[threadID, blockID] = individuals[blockID, threadID+1*brains.number_neurons+offset]
-        brains.b_c[threadID, blockID] = individuals[blockID, threadID+2*brains.number_neurons+offset]
+        @inbounds brains.b_r[threadID, blockID] = individuals[blockID, threadID+offset]
+        @inbounds brains.b_u[threadID, blockID] = individuals[blockID, threadID+1*brains.number_neurons+offset]
+        @inbounds brains.b_c[threadID, blockID] = individuals[blockID, threadID+2*brains.number_neurons+offset]
 
         offset += 3 * b_size
     end
 
     if threadID <= brains.number_outputs
         for i = 1:brains.number_neurons
-            brains.V[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_outputs+offset]
+            @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID+(i-1)*brains.number_outputs+offset]
         end
 
         offset += v_size
-        brains.b_v[threadID, blockID] = individuals[blockID, threadID+offset]
+        @inbounds brains.b_v[threadID, blockID] = individuals[blockID, threadID+offset]
     end
 
     sync_threads()
@@ -111,7 +111,7 @@ function reset(brains::GatedRecurrentUnitNN)
     blockID = blockIdx().x
 
     if threadID <= brains.number_neurons
-        brains.hidden_state[threadID, blockID] = 0.0
+        @inbounds brains.hidden_state[threadID, blockID] = 0.0
     end
 end
 
@@ -128,25 +128,25 @@ function step(brains::GatedRecurrentUnitNN, input, output, offset_memory)
         #Input calculation for gates
         for i = 1:brains.number_inputs
             #Reset Gate
-            gate_results[1, threadID] += brains.W_r[threadID, i, blockID] * input[i]
+            @inbounds gate_results[1, threadID] += brains.W_r[threadID, i, blockID] * input[i]
             #Update Gate
-            gate_results[2, threadID] += brains.W_u[threadID, i, blockID] * input[i]
+            @inbounds gate_results[2, threadID] += brains.W_u[threadID, i, blockID] * input[i]
         end
 
         #Hidden state calculation for gates 
         for i = 1:brains.number_neurons
             #Reset Gate
-            gate_results[1, threadID] += brains.U_r[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds gate_results[1, threadID] += brains.U_r[threadID, i, blockID] * brains.hidden_state[i, blockID]
             #Update Gate
-            gate_results[2, threadID] += brains.U_u[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds gate_results[2, threadID] += brains.U_u[threadID, i, blockID] * brains.hidden_state[i, blockID]
             #Current Gate
-            gate_results[3, threadID] += brains.U_c[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds gate_results[3, threadID] += brains.U_c[threadID, i, blockID] * brains.hidden_state[i, blockID]
         end
 
 
         #Adding Biases
-        gate_results[1, threadID] += brains.b_r[threadID, blockID]
-        gate_results[2, threadID] += brains.b_u[threadID, blockID]
+        @inbounds gate_results[1, threadID] += brains.b_r[threadID, blockID]
+        @inbounds gate_results[2, threadID] += brains.b_u[threadID, blockID]
 
         #Applying activation functions
         gate_results[1, threadID] = sigmoid(gate_results[1, threadID])
@@ -156,13 +156,13 @@ function step(brains::GatedRecurrentUnitNN, input, output, offset_memory)
         gate_results[3, threadID] *= gate_results[1, threadID]
 
         for i = 1:brains.number_inputs
-            gate_results[3, threadID] += brains.W_c[threadID, i, blockID] * input[i]
+            @inbounds gate_results[3, threadID] += brains.W_c[threadID, i, blockID] * input[i]
         end
-        gate_results[3, threadID] += brains.b_c[threadID, blockID]
+        @inbounds gate_results[3, threadID] += brains.b_c[threadID, blockID]
         gate_results[3, threadID] = tanh(gate_results[3, threadID])
 
         #Hidden state calculation
-        brains.hidden_state[threadID, blockID] =
+        @inbounds brains.hidden_state[threadID, blockID] =
             gate_results[2, threadID] * brains.hidden_state[threadID, blockID] +
             (1 - gate_results[2, threadID]) * gate_results[3, threadID]
     end
@@ -173,10 +173,10 @@ function step(brains::GatedRecurrentUnitNN, input, output, offset_memory)
     if threadID <= brains.number_outputs
         output[threadID] = 0.0
         for i = 1:brains.number_neurons
-            output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
         end
-        output[threadID] += brains.b_v[threadID, blockID]
-        output[threadID] = tanh(output[threadID])
+        @inbounds output[threadID] += brains.b_v[threadID, blockID]
+        @inbounds output[threadID] = tanh(output[threadID])
     end
 
 end

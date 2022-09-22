@@ -53,29 +53,29 @@ function initialize(brains::ElmanNetwork, individuals)
 
     if threadID <= brains.number_neurons 
         for i = 1:brains.number_inputs
-            brains.W[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + offset]
+            @inbounds brains.W[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + offset]
         end
 
         offset += w_size
 
         for i = 1:brains.number_neurons
-            brains.U[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + offset]
+            @inbounds brains.U[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_neurons + offset]
         end
 
         offset += u_size
 
-        brains.b[threadID, blockID] = individuals[blockID, threadID + offset]
+        @inbounds brains.b[threadID, blockID] = individuals[blockID, threadID + offset]
 
         offset += b_size
     end
 
     if threadID <= brains.number_outputs
         for i = 1:brains.number_neurons
-            brains.V[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_outputs + offset]
+            @inbounds brains.V[threadID, i, blockID] = individuals[blockID, threadID + (i-1) * brains.number_outputs + offset]
         end
 
         offset += v_size
-        brains.b_v[threadID,blockID] = individuals[blockID, threadID + offset]
+        @inbounds brains.b_v[threadID,blockID] = individuals[blockID, threadID + offset]
     end
 
     sync_threads()
@@ -93,7 +93,7 @@ function reset(brains::ElmanNetwork)
     blockID = blockIdx().x
 
     if threadID <= brains.number_neurons
-        brains.hidden_state[threadID, blockID] = 0.0
+        @inbounds brains.hidden_state[threadID, blockID] = 0.0
     end 
 end
 
@@ -116,18 +116,18 @@ function step(brains::ElmanNetwork, input, output, offset_memory)
 
         #Hidden state calculation for gates 
         for i = 1:brains.number_neurons
-            gate_results[threadID] += brains.U[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds gate_results[threadID] += brains.U[threadID, i, blockID] * brains.hidden_state[i, blockID]
         end
 
         #Adding Biases
-        gate_results[threadID] += brains.b[threadID, blockID]
+        @inbounds gate_results[threadID] += brains.b[threadID, blockID]
 
 
         #Applying activation function
         gate_results[threadID] = tanh(gate_results[threadID])
 
         #New Hidden state
-        brains.hidden_state[threadID, blockID] = gate_results[threadID]
+        @inbounds brains.hidden_state[threadID, blockID] = gate_results[threadID]
     end
     
     sync_threads()
@@ -136,9 +136,9 @@ function step(brains::ElmanNetwork, input, output, offset_memory)
     if threadID <= brains.number_outputs
         output[threadID] = 0.0
         for i = 1:brains.number_neurons
-            output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
+            @inbounds output[threadID] += brains.V[threadID, i, blockID] * brains.hidden_state[i, blockID]
         end
-        output[threadID] += brains.b_v[threadID, blockID]
+        @inbounds output[threadID] += brains.b_v[threadID, blockID]
         output[threadID] = tanh(output[threadID])
     end    
 
